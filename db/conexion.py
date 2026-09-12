@@ -4,14 +4,14 @@ import sqlite3
 
 def obtener_conexion():
   db_path = os.path.join(os.path.dirname(__file__), "autowash.db")
-  conexion = sqlite3.connect(db_path)
-  return conexion
+  return sqlite3.connect(db_path)
 
 
 def inicializar_db():
   conexion = obtener_conexion()
   cursor = conexion.cursor()
 
+  # Tabla de lavados
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS lavados (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,6 +20,21 @@ def inicializar_db():
             tipo_lavado TEXT NOT NULL,
             precio REAL NOT NULL
         )
+    """)
+
+  # Tabla de usuarios
+  cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    """)
+
+  # Usuario por defecto
+  cursor.execute("""
+        INSERT OR IGNORE INTO usuarios (usuario, password) 
+        VALUES ('admin', '1234')
     """)
 
   conexion.commit()
