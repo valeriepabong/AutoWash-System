@@ -11,7 +11,6 @@ def inicializar_db():
   conexion = obtener_conexion()
   cursor = conexion.cursor()
 
-  # Tabla de lavados
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS lavados (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,7 +21,6 @@ def inicializar_db():
         )
     """)
 
-  # Tabla de usuarios
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +29,15 @@ def inicializar_db():
         )
     """)
 
-  # Usuario por defecto
+  cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clientes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            telefono TEXT NOT NULL,
+            placa TEXT NOT NULL
+        )
+    """)
+
   cursor.execute("""
         INSERT OR IGNORE INTO usuarios (usuario, password) 
         VALUES ('admin', '1234')

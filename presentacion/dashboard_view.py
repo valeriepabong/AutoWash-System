@@ -5,10 +5,11 @@ from logica.gestion_servicios import ServicioLavado
 
 class DashboardView(ctk.CTkFrame):
 
-  def __init__(self, master, al_cerrar_sesion):
-    super().__init__(master)
+  def __init__(self, master, al_cerrar_sesion, al_abrir_clientes):
+    super().__init__(master) 
     self.master = master
     self.al_cerrar_sesion = al_cerrar_sesion
+    self.al_abrir_clientes = al_abrir_clientes
     self.id_seleccionado = None 
     self.pack(fill="both", expand=True, padx=20, pady=20)
 
@@ -35,8 +36,16 @@ class DashboardView(ctk.CTkFrame):
         width=100,
         command=self.al_cerrar_sesion,
     )
-    self.btn_logout.pack(side="right")
+    self.btn_logout.pack(side="right", padx=5)
 
+    self.btn_clientes = ctk.CTkButton(
+        header_frame,
+        text="Clientes",
+        fg_color="#1f538d",
+        width=100,
+        command=self.al_abrir_clientes,
+    )
+    self.btn_clientes.pack(side="right", padx=5)
 
     self.entry_placa = ctk.CTkEntry(
         self, placeholder_text="Ingrese la placa (Ej: ABC123)"
