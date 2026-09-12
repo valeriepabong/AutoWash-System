@@ -3,7 +3,6 @@ from datos.vehiculo_dao import VehiculoDAO
 
 class ServicioLavado:
 
-  # Tarifas predefinidas según tipo de lavado y vehículo
   PRECIOS = {
       "Sencillo": {"Automóvil": 15000, "Camioneta": 20000, "Moto": 8000},
       "General": {"Automóvil": 25000, "Camioneta": 35000, "Moto": 15000},
@@ -16,12 +15,10 @@ class ServicioLavado:
 
   @classmethod
   def calcular_precio(cls, tipo_vehiculo, tipo_lavado):
-    """Calcula el precio del servicio según el vehículo y el tipo de lavado."""
     return cls.PRECIOS.get(tipo_lavado, {}).get(tipo_vehiculo, 0)
 
   @classmethod
   def registrar_servicio(cls, placa, tipo_vehiculo, tipo_lavado):
-    """Valida la placa y registra el servicio en la base de datos a través del DAO."""
     placa_limpia = placa.strip().upper()
     if not placa_limpia:
       raise ValueError("La placa del vehículo no puede estar vacía.")
@@ -36,3 +33,8 @@ class ServicioLavado:
   def obtener_historial(cls):
     """Obtiene el listado completo de servicios registrados."""
     return VehiculoDAO.obtener_todos()
+
+  @classmethod
+  def obtener_total_servicios(cls):
+    """Obtiene el total de vehículos lavados desde la capa de datos."""
+    return VehiculoDAO.contar_registros()
