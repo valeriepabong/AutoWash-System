@@ -1,103 +1,100 @@
+import unicodedata
+
 from db.conexion import obtener_conexion
 
 
-def insertar_cliente(nombre, telefono):
-    """Inserta un nuevo cliente y devuelve el id generado."""
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
-    cursor.execute(
-        """
-        INSERT INTO clientes (nombre, telefono, activo)
-        VALUES (?, ?, 1)
-        """,
-        (nombre, telefono),
-    )
-    conexion.commit()
-    nuevo_id = cursor.lastrowid
-    conexion.close()
-    return nuevo_id
+class ClientesDatos:
 
+    @staticmethod
+    def insertar_cliente(nombre, telefono):
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute(
+            "INSERT INTO clientes (nombre, telefono, activo) VALUES (?, ?, 1)",
+            (nombre, telefono),
+        )
+        conexion.commit()
+        nuevo_id = cursor.lastrowid
+        conexion.close()
+        return nuevo_id
 
-def obtener_cliente_por_id(cliente_id):
-    """Devuelve un dict con los datos del cliente, o None si no existe."""
-    conexion = obtener_conexion()
-    conexion.row_factory = _dict_factory
-    cursor = conexion.cursor()
-    cursor.execute(
-        "SELECT id, nombre, telefono, activo FROM clientes WHERE id = ?",
-        (cliente_id,),
-    )
-    fila = cursor.fetchone()
-    conexion.close()
-    return fila
+    @staticmethod
+    def obtener_cliente_por_id(cliente_id):
+        conexion = obtener_conexion()
+        conexion.row_factory = ClientesDatos._dict_factory
+        cursor = conexion.cursor()
+        cursor.execute(
+            "SELECT id, nombre, telefono, activo FROM clientes WHERE id = ?",
+            (cliente_id,),
+        )
+        fila = cursor.fetchone()
+        conexion.close()
+        return fila
 
+    @staticmethod
+    def listar_clientes(solo_activos=True):
+        conexion = obtener_conexion()
+        conexion.row_factory = ClientesDatos._dict_factory
+        cursor = conexion.cursor()
+        if solo_activos:
+            cursor.execute(
+                "SELECT id, nombre, telefono, activo FROM clientes WHERE activo = 1 ORDER BY nombre"
+            )
+        else:
+            cursor.execute(
+                "SELECT id, nombre, telefono, activo FROM clientes ORDER BY nombre"
+            )
+        filas = cursor.fetchall()
+        conexion.close()
+        return filas
 
-def listar_clientes(solo_activos=True):
-    """Devuelve la lista completa de clientes (activos por defecto)."""
-    conexion = obtener_conexion()
-    conexion.row_factory = _dict_factory
-    cursor = conexion.cursor()
-    if solo_activos:
+    @staticmethod
+    def buscar_clientes_por_nombre(texto_busqueda):
+        conexion = obtener_conexion()
+        conexion.row_factory = ClientesDatos._dict_factory
+        cursor = conexion.cursor()
         cursor.execute(
             "SELECT id, nombre, telefono, activo FROM clientes WHERE activo = 1 ORDER BY nombre"
         )
-    else:
+        todos = cursor.fetchall()
+        conexion.close()
+
+        texto_normalizado = ClientesDatos._normalizar(texto_busqueda)
+        return [
+            cliente for cliente in todos
+            if texto_normalizado in ClientesDatos._normalizar(cliente["nombre"])
+        ]
+
+    @staticmethod
+    def actualizar_cliente(cliente_id, nombre, telefono):
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
         cursor.execute(
-            "SELECT id, nombre, telefono, activo FROM clientes ORDER BY nombre"
+            "UPDATE clientes SET nombre = ?, telefono = ? WHERE id = ?",
+            (nombre, telefono, cliente_id),
         )
-    filas = cursor.fetchall()
-    conexion.close()
-    return filas
+        filas_afectadas = cursor.rowcount
+        conexion.commit()
+        conexion.close()
+        return filas_afectadas > 0
 
+    @staticmethod
+    def desactivar_cliente(cliente_id):
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE clientes SET activo = 0 WHERE id = ?", (cliente_id,))
+        filas_afectadas = cursor.rowcount
+        conexion.commit()
+        conexion.close()
+        return filas_afectadas > 0
 
-def buscar_clientes_por_nombre(texto_busqueda):
-    """Busca clientes activos cuyo nombre contenga el texto dado (parcial, sin importar mayúsculas)."""
-    conexion = obtener_conexion()
-    conexion.row_factory = _dict_factory
-    cursor = conexion.cursor()
-    patron = f"%{texto_busqueda}%"
-    cursor.execute(
-        """
-        SELECT id, nombre, telefono, activo
-        FROM clientes
-        WHERE activo = 1 AND nombre LIKE ? COLLATE NOCASE
-        ORDER BY nombre
-        """,
-        (patron,),
-    )
-    filas = cursor.fetchall()
-    conexion.close()
-    return filas
+    @staticmethod
+    def _normalizar(texto):
+        texto = texto.lower()
+        texto = unicodedata.normalize("NFKD", texto)
+        return "".join(c for c in texto if not unicodedata.combining(c))
 
-
-def actualizar_cliente(cliente_id, nombre, telefono):
-    """Actualiza nombre y teléfono de un cliente existente."""
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
-    cursor.execute(
-        "UPDATE clientes SET nombre = ?, telefono = ? WHERE id = ?",
-        (nombre, telefono, cliente_id),
-    )
-    filas_afectadas = cursor.rowcount
-    conexion.commit()
-    conexion.close()
-    return filas_afectadas > 0
-
-
-def desactivar_cliente(cliente_id):
-    """Borrado lógico: marca al cliente como inactivo en vez de eliminarlo."""
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
-    cursor.execute(
-        "UPDATE clientes SET activo = 0 WHERE id = ?",
-        (cliente_id,),
-    )
-    filas_afectadas = cursor.rowcount
-    conexion.commit()
-    conexion.close()
-    return filas_afectadas > 0
-
-
-def _dict_factory(cursor, fila):
-    columnas = [descripcion[0] for descripcion in cursor.description]
-    return dict(zip(columnas, fila))
+    @staticmethod
+    def _dict_factory(cursor, fila):
+        columnas = [descripcion[0] for descripcion in cursor.description]
+        return dict(zip(columnas, fila))

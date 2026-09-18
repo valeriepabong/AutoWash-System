@@ -1,6 +1,6 @@
 from tkinter import messagebox, ttk
 import customtkinter as ctk
-from logica.clientes_logica import ClienteServicio
+from logica.clientes_logica import ClientesLogica
 
 
 class ClientesScreen(ctk.CTkFrame):
@@ -15,13 +15,13 @@ class ClientesScreen(ctk.CTkFrame):
     self._cargar_tabla()
 
   def _crear_interfaz(self):
-  
+
     header_frame = ctk.CTkFrame(self, fg_color="transparent")
     header_frame.pack(fill="x", pady=(0, 10))
 
     ctk.CTkLabel(
         header_frame,
-        text="Gestión de Clientes Frecuentes",
+        text="Gestión de Clientes",
         font=ctk.CTkFont(size=20, weight="bold"),
     ).pack(side="left")
 
@@ -45,11 +45,6 @@ class ClientesScreen(ctk.CTkFrame):
     )
     self.entry_telefono.pack(pady=5, fill="x", padx=40)
 
-    self.entry_placa = ctk.CTkEntry(
-        self, placeholder_text="Placa del vehículo asociado (Ej: ABC123)"
-    )
-    self.entry_placa.pack(pady=5, fill="x", padx=40)
-
     btn_registrar = ctk.CTkButton(
         self,
         text="Registrar Cliente",
@@ -58,22 +53,19 @@ class ClientesScreen(ctk.CTkFrame):
     )
     btn_registrar.pack(pady=10)
 
-    columnas = ("id", "nombre", "telefono", "placa")
+    columnas = ("id", "nombre", "telefono")
     self.tabla = ttk.Treeview(self, columns=columnas, show="headings", height=8)
 
     self.tabla.heading("id", text="ID")
     self.tabla.heading("nombre", text="Nombre")
     self.tabla.heading("telefono", text="Teléfono")
-    self.tabla.heading("placa", text="Placa Vehículo")
 
     self.tabla.column("id", width=40, anchor="center")
-    self.tabla.column("nombre", width=180, anchor="center")
-    self.tabla.column("telefono", width=120, anchor="center")
-    self.tabla.column("placa", width=100, anchor="center")
+    self.tabla.column("nombre", width=200, anchor="center")
+    self.tabla.column("telefono", width=140, anchor="center")
 
     self.tabla.pack(pady=10, fill="both", expand=True, padx=20)
 
-  
     btn_eliminar = ctk.CTkButton(
         self,
         text="Eliminar Cliente Seleccionado",
@@ -87,22 +79,23 @@ class ClientesScreen(ctk.CTkFrame):
     for item in self.tabla.get_children():
       self.tabla.delete(item)
 
-    registros = ClienteServicio.obtener_clientes()
-    for reg in registros:
-      self.tabla.insert("", "end", values=reg)
+    registros = ClientesLogica.listar_todos_los_clientes()
+    for cliente in registros:
+      self.tabla.insert(
+          "", "end",
+          values=(cliente["id"], cliente["nombre"], cliente["telefono"] or "")
+      )
 
   def _limpiar_formulario(self):
     self.entry_nombre.delete(0, "end")
     self.entry_telefono.delete(0, "end")
-    self.entry_placa.delete(0, "end")
 
   def _evento_registrar(self):
     nombre = self.entry_nombre.get()
     telefono = self.entry_telefono.get()
-    placa = self.entry_placa.get()
 
     try:
-      ClienteServicio.registrar_cliente(nombre, telefono, placa)
+      ClientesLogica.registrar_cliente(nombre, telefono)
       messagebox.showinfo("Éxito", "Cliente registrado correctamente.")
       self._limpiar_formulario()
       self._cargar_tabla()
@@ -125,7 +118,7 @@ class ClientesScreen(ctk.CTkFrame):
     )
     if confirmar:
       try:
-        ClienteServicio.eliminar_cliente(id_cliente)
+        ClientesLogica.eliminar_cliente(id_cliente)
         messagebox.showinfo(
             "Éxito", "El cliente ha sido eliminado correctamente."
         )

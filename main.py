@@ -1,60 +1,54 @@
 import customtkinter as ctk
+
 from db.conexion import inicializar_db
-from presentacion.clientes_screen import ClientesScreen
-from presentacion.dashboard_view import DashboardView
 from presentacion.login_view import LoginView
+from presentacion.dashboard_view import DashboardView
+from presentacion.clientes_screen import ClientesScreen
+from presentacion.vehiculos_screen import VehiculosScreen
 
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("blue")
 
+class AplicacionPrincipal(ctk.CTk):
 
-class MainApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-  def __init__(self):
-    super().__init__()
-    self.geometry("600x650")
-    inicializar_db()
+        self.title("AutoWash System")
+        self.geometry("800x600")
 
-    self.dashboard = None
-    self.vista_login = None
-    self.vista_clientes = None
-    self.mostrar_login()
+        inicializar_db()
 
-  def mostrar_login(self):
-    self._destruir_vistas()
-    self.title("AutoWash System - Acceso")
-    self.vista_login = LoginView(
-        self, al_ingresar_exitoso=self.mostrar_dashboard
-    )
+        self.mostrar_login()
 
-  def mostrar_dashboard(self):
-    self._destruir_vistas()
-    self.title("AutoWash System - Gestión de Lavadero")
-    self.dashboard = DashboardView(
-        self,
-        al_cerrar_sesion=self.mostrar_login,
-        al_abrir_clientes=self.mostrar_clientes,
-    )
+    def _limpiar_pantalla(self):
+        """Destruye cualquier pantalla (frame) actualmente visible."""
+        for widget in self.winfo_children():
+            widget.destroy()
 
-  def mostrar_clientes(self):
-    self._destruir_vistas()
-    self.title("AutoWash System - Clientes Frecuentes")
-    self.vista_clientes = ClientesScreen(
-        self, al_volver=self.mostrar_dashboard
-    )
+    def mostrar_login(self):
+        self._limpiar_pantalla()
+        LoginView(self, al_ingresar_exitoso=self.mostrar_dashboard)
 
-  def _destruir_vistas(self):
-    if self.vista_login:
-      self.vista_login.destroy()
-      self.vista_login = None
-    if self.dashboard:
-      self.dashboard.destroy()
-      self.dashboard = None
-    if self.vista_clientes:
-      self.vista_clientes.destroy()
-      self.vista_clientes = None
+    def mostrar_dashboard(self):
+        self._limpiar_pantalla()
+        DashboardView(
+            self,
+            al_cerrar_sesion=self.mostrar_login,
+            al_abrir_clientes=self.mostrar_clientes,
+            al_abrir_vehiculos=self.mostrar_vehiculos,
+        )
+
+    def mostrar_clientes(self):
+        self._limpiar_pantalla()
+        ClientesScreen(self, al_volver=self.mostrar_dashboard)
+
+    def mostrar_vehiculos(self):
+        self._limpiar_pantalla()
+        VehiculosScreen(self)  # más abajo explico el detalle de esta pantalla
 
 
 if __name__ == "__main__":
-  app = MainApp()
-  app.mainloop()
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("blue")
+
+    app = AplicacionPrincipal()
+    app.mainloop()

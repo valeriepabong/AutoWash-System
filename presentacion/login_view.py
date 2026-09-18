@@ -1,6 +1,6 @@
 from tkinter import messagebox
 import customtkinter as ctk
-from logica.autenticacion_logica import AutenticacionServicio
+from logica.login_logica import LoginLogica
 
 
 class LoginView(ctk.CTkFrame):
@@ -36,7 +36,7 @@ class LoginView(ctk.CTkFrame):
     pwd = self.entry_password.get()
 
     try:
-      AutenticacionServicio.iniciar_sesion(usr, pwd)
+      LoginLogica.iniciar_sesion(usr, pwd)
       self.destroy()
       self.al_ingresar_exitoso()
     except ValueError as err:

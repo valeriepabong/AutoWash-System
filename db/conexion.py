@@ -13,28 +13,6 @@ def inicializar_db():
     conexion = obtener_conexion()
     cursor = conexion.cursor()
 
-# Tabla de lavados
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS lavados (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            placa TEXT NOT NULL,
-            tipo_vehiculo TEXT NOT NULL,
-            tipo_lavado TEXT NOT NULL,
-            precio REAL NOT NULL
-        )
-    """)
-
-    # Tabla de vehículos
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS vehiculos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            marca TEXT NOT NULL,
-            modelo TEXT NOT NULL,
-            placa TEXT NOT NULL UNIQUE,
-            tipo_vehiculo TEXT NOT NULL
-        )
-    """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,6 +32,19 @@ def inicializar_db():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS vehiculos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            placa TEXT NOT NULL UNIQUE,
+            marca TEXT,
+            modelo TEXT,
+            tipo_vehiculo TEXT NOT NULL,
+            cliente_id INTEGER NOT NULL,
+            activo INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+        )
+    """)
+
     conexion.commit()
     conexion.close()
 
@@ -62,5 +53,5 @@ def inicializar_db():
 
 def _crear_admin_por_defecto():
     """Crea un usuario admin/admin123 si la tabla usuarios está vacía."""
-    from logica.login_logica import crear_usuario_admin_si_no_existe
-    crear_usuario_admin_si_no_existe()
+    from logica.login_logica import LoginLogica
+    LoginLogica.crear_usuario_admin_si_no_existe()

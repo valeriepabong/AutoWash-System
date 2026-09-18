@@ -1,72 +1,47 @@
-from datos.clientes_datos import (
-    insertar_cliente,
-    obtener_cliente_por_id,
-    listar_clientes,
-    buscar_clientes_por_nombre,
-    actualizar_cliente,
-    desactivar_cliente,
-)
+from datos.clientes_datos import ClientesDatos
 
 
-def registrar_cliente(nombre, telefono=None):
-    """
-    Registra un nuevo cliente.
-    Lanza ValueError si el nombre es inválido.
-    Devuelve el id del cliente creado.
-    """
-    nombre = (nombre or "").strip()
-    if not nombre:
-        raise ValueError("El nombre del cliente es obligatorio.")
+class ClientesLogica:
 
-    telefono = (telefono or "").strip() or None
+    @staticmethod
+    def registrar_cliente(nombre, telefono=None):
+        nombre = (nombre or "").strip()
+        if not nombre:
+            raise ValueError("El nombre del cliente es obligatorio.")
 
-    return insertar_cliente(nombre, telefono)
+        telefono = (telefono or "").strip() or None
+        return ClientesDatos.insertar_cliente(nombre, telefono)
 
+    @staticmethod
+    def obtener_cliente(cliente_id):
+        return ClientesDatos.obtener_cliente_por_id(cliente_id)
 
-def obtener_cliente(cliente_id):
-    """Devuelve un cliente por su id, o None si no existe."""
-    return obtener_cliente_por_id(cliente_id)
+    @staticmethod
+    def listar_todos_los_clientes():
+        return ClientesDatos.listar_clientes(solo_activos=True)
 
+    @staticmethod
+    def buscar_clientes(texto_busqueda):
+        texto_busqueda = (texto_busqueda or "").strip()
+        if not texto_busqueda:
+            return ClientesDatos.listar_clientes(solo_activos=True)
+        return ClientesDatos.buscar_clientes_por_nombre(texto_busqueda)
 
-def listar_todos_los_clientes():
-    """Devuelve el listado de clientes activos."""
-    return listar_clientes(solo_activos=True)
+    @staticmethod
+    def editar_cliente(cliente_id, nombre, telefono=None):
+        nombre = (nombre or "").strip()
+        if not nombre:
+            raise ValueError("El nombre del cliente es obligatorio.")
 
+        telefono = (telefono or "").strip() or None
 
-def buscar_clientes(texto_busqueda):
-    """
-    Busca clientes por nombre (parcial). Si el texto de búsqueda está vacío,
-    devuelve el listado completo.
-    """
-    texto_busqueda = (texto_busqueda or "").strip()
-    if not texto_busqueda:
-        return listar_clientes(solo_activos=True)
-    return buscar_clientes_por_nombre(texto_busqueda)
+        if ClientesDatos.obtener_cliente_por_id(cliente_id) is None:
+            raise ValueError("El cliente no existe.")
 
+        ClientesDatos.actualizar_cliente(cliente_id, nombre, telefono)
 
-def editar_cliente(cliente_id, nombre, telefono=None):
-    """
-    Edita nombre y teléfono de un cliente existente.
-    Lanza ValueError si el nombre es inválido o si el cliente no existe.
-    """
-    nombre = (nombre or "").strip()
-    if not nombre:
-        raise ValueError("El nombre del cliente es obligatorio.")
-
-    telefono = (telefono or "").strip() or None
-
-    if obtener_cliente_por_id(cliente_id) is None:
-        raise ValueError("El cliente no existe.")
-
-    actualizar_cliente(cliente_id, nombre, telefono)
-
-
-def eliminar_cliente(cliente_id):
-    """
-    Elimina (lógicamente) un cliente.
-    Lanza ValueError si el cliente no existe.
-    """
-    if obtener_cliente_por_id(cliente_id) is None:
-        raise ValueError("El cliente no existe.")
-
-    desactivar_cliente(cliente_id)
+    @staticmethod
+    def eliminar_cliente(cliente_id):
+        if ClientesDatos.obtener_cliente_por_id(cliente_id) is None:
+            raise ValueError("El cliente no existe.")
+        ClientesDatos.desactivar_cliente(cliente_id)
