@@ -45,13 +45,61 @@ def inicializar_db():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS empleados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            activo INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS servicios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL UNIQUE,
+            precio REAL NOT NULL,
+            activo INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ordenes_servicio (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehiculo_id INTEGER NOT NULL,
+            empleado_id INTEGER,
+            fecha_hora TEXT NOT NULL,
+            total REAL NOT NULL DEFAULT 0,
+            estado TEXT NOT NULL DEFAULT 'pendiente',
+            FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id),
+            FOREIGN KEY (empleado_id) REFERENCES empleados(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS orden_servicio_detalle (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            orden_id INTEGER NOT NULL,
+            servicio_id INTEGER NOT NULL,
+            precio_aplicado REAL NOT NULL,
+            FOREIGN KEY (orden_id) REFERENCES ordenes_servicio(id),
+            FOREIGN KEY (servicio_id) REFERENCES servicios(id)
+        )
+    """)
+
     conexion.commit()
     conexion.close()
 
     _crear_admin_por_defecto()
+    _crear_servicios_por_defecto()
 
 
 def _crear_admin_por_defecto():
     """Crea un usuario admin/admin123 si la tabla usuarios está vacía."""
     from logica.login_logica import LoginLogica
     LoginLogica.crear_usuario_admin_si_no_existe()
+
+
+def _crear_servicios_por_defecto():
+    """Crea un catálogo básico de servicios si la tabla está vacía."""
+    from logica.servicios_logica import ServiciosLogica
+    ServiciosLogica.crear_catalogo_por_defecto_si_no_existe()
