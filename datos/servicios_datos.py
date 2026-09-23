@@ -67,6 +67,20 @@ class ServiciosDatos:
         return total
 
     @staticmethod
+    def actualizar_servicio(servicio_id, nombre, precio):
+        """Actualiza nombre y precio de un servicio del catálogo (Update del CRUD)."""
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute(
+            "UPDATE servicios SET nombre = ?, precio = ? WHERE id = ?",
+            (nombre, precio, servicio_id),
+        )
+        filas_afectadas = cursor.rowcount
+        conexion.commit()
+        conexion.close()
+        return filas_afectadas > 0
+
+    @staticmethod
     def desactivar_servicio(servicio_id):
         conexion = obtener_conexion()
         cursor = conexion.cursor()

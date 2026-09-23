@@ -55,13 +55,27 @@ class EmpleadosDatos:
         cursor.execute(
             """
             SELECT COUNT(*) FROM ordenes_servicio
-            WHERE empleado_id = ? AND estado = 'finalizado'
+            WHERE empleado_id = ? AND estado = 'entregado'
             """,
             (empleado_id,),
         )
         total = cursor.fetchone()[0]
         conexion.close()
         return total
+
+    @staticmethod
+    def actualizar_empleado(empleado_id, nombre):
+        """Actualiza el nombre de un empleado existente (Update del CRUD)."""
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute(
+            "UPDATE empleados SET nombre = ? WHERE id = ?",
+            (nombre, empleado_id),
+        )
+        filas_afectadas = cursor.rowcount
+        conexion.commit()
+        conexion.close()
+        return filas_afectadas > 0
 
     @staticmethod
     def desactivar_empleado(empleado_id):

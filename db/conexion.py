@@ -69,7 +69,7 @@ def inicializar_db():
             empleado_id INTEGER,
             fecha_hora TEXT NOT NULL,
             total REAL NOT NULL DEFAULT 0,
-            estado TEXT NOT NULL DEFAULT 'pendiente',
+            estado TEXT NOT NULL DEFAULT 'espera',
             FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id),
             FOREIGN KEY (empleado_id) REFERENCES empleados(id)
         )
@@ -89,8 +89,24 @@ def inicializar_db():
     conexion.commit()
     conexion.close()
 
+    _migrar_estados_legacy()
     _crear_admin_por_defecto()
     _crear_servicios_por_defecto()
+
+
+def _migrar_estados_legacy():
+    """
+    Compatibilidad con bases de datos creadas antes de este sprint, cuando
+    'ordenes_servicio.estado' solo tenía 'pendiente' / 'finalizado'.
+    Si alguien ya tiene un autowash.db con esos valores, los actualiza a la
+    nueva nomenclatura de 4 estados en vez de dejarlos "atascados".
+    """
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE ordenes_servicio SET estado = 'espera' WHERE estado = 'pendiente'")
+    cursor.execute("UPDATE ordenes_servicio SET estado = 'entregado' WHERE estado = 'finalizado'")
+    conexion.commit()
+    conexion.close()
 
 
 def _crear_admin_por_defecto():
