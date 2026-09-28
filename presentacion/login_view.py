@@ -1,43 +1,44 @@
-from tkinter import messagebox
 import customtkinter as ctk
+from tkinter import messagebox
 from logica.login_logica import LoginLogica
 
-
 class LoginView(ctk.CTkFrame):
+    def __init__(self, parent, al_ingresar=None):
+        super().__init__(parent)
+        self.al_ingresar = al_ingresar
+        self.pack(fill="both", expand=True)
 
-  def __init__(self, master, al_ingresar_exitoso):
-    super().__init__(master)
-    self.master = master
-    self.al_ingresar_exitoso = al_ingresar_exitoso
-    self.pack(fill="both", expand=True, padx=20, pady=20)
+        self.frame_login = ctk.CTkFrame(self, width=350, height=400)
+        self.frame_login.place(relx=0.5, rely=0.5, anchor="center")
 
-    self._crear_interfaz()
+        lbl_titulo = ctk.CTkLabel(self.frame_login, text="Iniciar Sesión", font=("Roboto", 22, "bold"))
+        lbl_titulo.pack(pady=(30, 20))
 
-  def _crear_interfaz(self):
-    ctk.CTkLabel(
-        self, text="Iniciar Sesión", font=ctk.CTkFont(size=22, weight="bold")
-    ).pack(pady=20)
+        self.txt_usuario = ctk.CTkEntry(self.frame_login, placeholder_text="Usuario", width=250)
+        self.txt_usuario.pack(pady=10)
 
-    self.entry_usuario = ctk.CTkEntry(self, placeholder_text="Usuario")
-    self.entry_usuario.pack(pady=10, fill="x", padx=50)
+        self.txt_password = ctk.CTkEntry(self.frame_login, placeholder_text="Contraseña", show="*", width=250)
+        self.txt_password.pack(pady=10)
 
-    self.entry_password = ctk.CTkEntry(
-        self, placeholder_text="Contraseña", show="*"
-    )
-    self.entry_password.pack(pady=10, fill="x", padx=50)
+        btn_ingresar = ctk.CTkButton(self.frame_login, text="Ingresar", command=self._validar_login, width=250)
+        btn_ingresar.pack(pady=20)
 
-    btn_ingresar = ctk.CTkButton(
-        self, text="Ingresar", command=self._evento_ingresar
-    )
-    btn_ingresar.pack(pady=20)
+    def _validar_login(self):
+        usuario = self.txt_usuario.get().strip()
+        password = self.txt_password.get().strip()
 
-  def _evento_ingresar(self):
-    usr = self.entry_usuario.get()
-    pwd = self.entry_password.get()
+        if not usuario or not password:
+            messagebox.showwarning("Advertencia", "Por favor ingrese usuario y contraseña.")
+            return
 
-    try:
-      LoginLogica.iniciar_sesion(usr, pwd)
-      self.destroy()
-      self.al_ingresar_exitoso()
-    except ValueError as err:
-      messagebox.showerror("Error de Autenticación", str(err))
+        try:
+            # Usamos la función exacta de tus compañeros
+            LoginLogica.iniciar_sesion(usuario, password)
+            
+            
+            if self.al_ingresar:
+                self.al_ingresar()
+                
+        except ValueError as e:
+            # Captura el texto de error que lanzaron ("Usuario o contraseña incorrectos.")
+            messagebox.showerror("Error de Autenticación", str(e))

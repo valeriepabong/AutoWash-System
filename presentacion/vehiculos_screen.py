@@ -1,146 +1,110 @@
 import customtkinter as ctk
-from tkinter import messagebox
-
+from tkinter import ttk, messagebox
 from logica.vehiculos_logica import VehiculosLogica
 from logica.clientes_logica import ClientesLogica
 
-
 class VehiculosScreen(ctk.CTkFrame):
-
-    def __init__(self, master):
-        super().__init__(master)
-
-        self.master = master
-        self.clientes_disponibles = []  # guarda los dicts de clientes cargados
-
+    def __init__(self, parent, al_volver=None):
+        super().__init__(parent)
+        self.al_volver = al_volver
         self.pack(fill="both", expand=True, padx=20, pady=20)
 
-        self.crear_interfaz()
-        self.cargar_clientes_en_combo()
-        self.mostrar_vehiculos()
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 15))
 
-    def crear_interfaz(self):
+        titulo = ctk.CTkLabel(header_frame, text="Gestión de Vehículos", font=("Roboto", 24, "bold"))
+        titulo.pack(side="left")
 
-        titulo = ctk.CTkLabel(
-            self,
-            text="Gestión de Vehículos",
-            font=ctk.CTkFont(size=24, weight="bold")
-        )
-        titulo.pack(pady=15)
+        if self.al_volver:
+            btn_volver = ctk.CTkButton(header_frame, text="Volver al Dashboard", command=self.al_volver, fg_color="#555555", hover_color="#333333")
+            btn_volver.pack(side="right")
 
-        # Cliente asociado (desplegable)
-        self.combo_cliente = ctk.CTkOptionMenu(self, values=["Sin clientes registrados"])
-        self.combo_cliente.pack(pady=8, fill="x", padx=40)
+        form_frame = ctk.CTkFrame(self)
+        form_frame.pack(fill="x", pady=10, padx=10)
 
-        # Marca
-        self.entry_marca = ctk.CTkEntry(self, placeholder_text="Marca del vehículo (opcional)")
-        self.entry_marca.pack(pady=5, fill="x", padx=40)
+        self.cb_clientes = ctk.CTkComboBox(form_frame, width=300)
+        self.cb_clientes.pack(pady=5)
 
-        # Modelo
-        self.entry_modelo = ctk.CTkEntry(self, placeholder_text="Modelo del vehículo (opcional)")
-        self.entry_modelo.pack(pady=5, fill="x", padx=40)
+        self.txt_marca = ctk.CTkEntry(form_frame, placeholder_text="Marca del vehículo (opcional)", width=300)
+        self.txt_marca.pack(pady=5)
 
-        # Placa
-        self.entry_placa = ctk.CTkEntry(self, placeholder_text="Placa del vehículo")
-        self.entry_placa.pack(pady=5, fill="x", padx=40)
+        self.txt_modelo = ctk.CTkEntry(form_frame, placeholder_text="Modelo del vehículo (opcional)", width=300)
+        self.txt_modelo.pack(pady=5)
 
-        # Tipo de vehículo
-        self.combo_tipo = ctk.CTkOptionMenu(
-            self, values=["Automóvil", "Camioneta", "Moto"]
-        )
-        self.combo_tipo.pack(pady=8)
+        self.txt_placa = ctk.CTkEntry(form_frame, placeholder_text="Placa del vehículo", width=300)
+        self.txt_placa.pack(pady=5)
 
-        # Botón registrar
-        boton_registrar = ctk.CTkButton(
-            self, text="Registrar vehículo", command=self.registrar_vehiculo
-        )
-        boton_registrar.pack(pady=10)
+        self.cb_tipo = ctk.CTkComboBox(form_frame, values=["Automóvil", "Motocicleta", "Camioneta", "Camión"])
+        self.cb_tipo.pack(pady=5)
 
-        # Área para mostrar vehículos
-        self.lista = ctk.CTkTextbox(self, width=500, height=200)
-        self.lista.pack(pady=10, padx=40, fill="both", expand=True)
+        btn_registrar = ctk.CTkButton(form_frame, text="Registrar vehículo", command=self._registrar)
+        btn_registrar.pack(pady=10)
 
-    def cargar_clientes_en_combo(self):
-        self.clientes_disponibles = ClientesLogica.listar_todos_los_clientes()
+        self.tabla = ttk.Treeview(self, columns=("ID", "Placa", "Marca", "Modelo", "Tipo", "Cliente"), show="headings", height=8)
+        self.tabla.heading("ID", text="ID")
+        self.tabla.heading("Placa", text="Placa")
+        self.tabla.heading("Marca", text="Marca")
+        self.tabla.heading("Modelo", text="Modelo")
+        self.tabla.heading("Tipo", text="Tipo")
+        self.tabla.heading("Cliente", text="Cliente")
 
-        if not self.clientes_disponibles:
-            self.combo_cliente.configure(values=["Sin clientes registrados"])
-            self.combo_cliente.set("Sin clientes registrados")
-            return
+        self.tabla.column("ID", width=40, anchor="center")
+        self.tabla.column("Placa", width=100, anchor="center")
+        self.tabla.column("Marca", width=120, anchor="center")
+        self.tabla.column("Modelo", width=120, anchor="center")
+        self.tabla.column("Tipo", width=100, anchor="center")
+        self.tabla.column("Cliente", width=180, anchor="center")
 
-        opciones = [
-            f"{c['id']} - {c['nombre']}" for c in self.clientes_disponibles
-        ]
-        self.combo_cliente.configure(values=opciones)
-        self.combo_cliente.set(opciones[0])
+        self.tabla.pack(fill="both", expand=True, pady=10)
 
-    def obtener_cliente_id_seleccionado(self):
-        seleccion = self.combo_cliente.get()
-        if not self.clientes_disponibles or seleccion == "Sin clientes registrados":
-            return None
-        # La opción tiene formato "3 - Juan Pérez", tomamos el id antes del " - "
-        id_texto = seleccion.split(" - ")[0]
-        return int(id_texto)
+        self._cargar_clientes()
+        self._cargar_vehiculos()
 
-    def registrar_vehiculo(self):
-
-        cliente_id = self.obtener_cliente_id_seleccionado()
-        marca = self.entry_marca.get()
-        modelo = self.entry_modelo.get()
-        placa = self.entry_placa.get()
-        tipo = self.combo_tipo.get()
-
-        if cliente_id is None:
-            messagebox.showerror(
-                "Error",
-                "Debe registrar al menos un cliente antes de asociar un vehículo."
-            )
-            return
-
+    def _cargar_clientes(self):
         try:
-            VehiculosLogica.registrar_vehiculo(
-                placa=placa,
-                tipo_vehiculo=tipo,
-                cliente_id=cliente_id,
-                marca=marca,
-                modelo=modelo,
-            )
+            clientes = ClientesLogica.obtener_vehiculos()
+            if clientes:
+                opciones = [f"{c['id']} - {c['nombre']}" for c in clientes]
+                self.cb_clientes.configure(values=opciones)
+                self.cb_clientes.set(opciones[0])
+            else:
+                self.cb_clientes.configure(values=["Sin clientes registrados"])
+                self.cb_clientes.set("Sin clientes registrados")
+        except Exception:
+            self.cb_clientes.configure(values=["Sin clientes registrados"])
 
-            messagebox.showinfo(
-                "Registro exitoso", "El vehículo fue registrado correctamente."
-            )
+    def _cargar_vehiculos(self):
+        for item in self.tabla.get_children():
+            self.tabla.delete(item)
+        try:
+            vehiculos = VehiculosLogica.obtener_vehiculos()
+            for v in vehiculos:
+                self.tabla.insert("", "end", values=(v.get("id"), v.get("placa"), v.get("marca", ""), v.get("modelo", ""), v.get("tipo_vehiculo"), v.get("cliente_nombre", "")))
+        except Exception as e:
+            print(f"Error al cargar vehículos: {e}")
 
-            self.limpiar_campos()
-            self.mostrar_vehiculos()
-
-        except ValueError as error:
-            messagebox.showerror(
-                "Error", f"No se pudo registrar el vehículo.\n\n{error}"
-            )
-
-    def mostrar_vehiculos(self):
-
-        self.lista.delete("1.0", "end")
-
-        vehiculos = VehiculosLogica.obtener_vehiculos()
-
-        if not vehiculos:
-            self.lista.insert("end", "No hay vehículos registrados.")
+    def _registrar(self):
+        cliente_sel = self.cb_clientes.get()
+        if not cliente_sel or cliente_sel == "Sin clientes registrados":
+            messagebox.showwarning("Advertencia", "Debe seleccionar un cliente válido.")
             return
 
-        for vehiculo in vehiculos:
-            texto = (
-                f"ID: {vehiculo['id']}\n"
-                f"Placa: {vehiculo['placa']}\n"
-                f"Tipo: {vehiculo['tipo_vehiculo']}\n"
-                f"Marca: {vehiculo['marca'] or '-'}\n"
-                f"Modelo: {vehiculo['modelo'] or '-'}\n"
-                f"Cliente: {vehiculo['nombre_cliente']}\n"
-                f"{'-' * 40}\n"
-            )
-            self.lista.insert("end", texto)
+        placa = self.txt_placa.get().strip()
+        if not placa:
+            messagebox.showwarning("Advertencia", "La placa es obligatoria.")
+            return
 
-    def limpiar_campos(self):
-        self.entry_marca.delete(0, "end")
-        self.entry_modelo.delete(0, "end")
-        self.entry_placa.delete(0, "end")
+        cliente_id = int(cliente_sel.split(" - ")[0])
+        marca = self.txt_marca.get().strip()
+        modelo = self.txt_modelo.get().strip()
+        tipo = self.cb_tipo.get()
+
+        exito, msg = VehiculosLogica.crear_vehiculo(placa, marca, modelo, tipo, cliente_id)
+        if exito:
+            messagebox.showinfo("Éxito", msg)
+            self.txt_placa.delete(0, "end")
+            self.txt_marca.delete(0, "end")
+            self.txt_modelo.delete(0, "end")
+            self._cargar_vehiculos()
+        else:
+            messagebox.showerror("Error", msg)

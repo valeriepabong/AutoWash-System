@@ -7,11 +7,10 @@ from logica.empleados_logica import EmpleadosLogica
 
 
 class ServiciosScreen(ctk.CTkFrame):
-
-    def _init_(self, master, al_volver):
-        super()._init_(master)
-        self.master = master
+    def __init__(self, parent, al_volver=None):
+        super().__init__(parent)
         self.al_volver = al_volver
+       
 
         self.vehiculos_disponibles = []
         self.empleados_disponibles = []
