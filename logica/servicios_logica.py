@@ -8,8 +8,8 @@ from datos.empleados_datos import EmpleadosDatos
 
 class ServiciosLogica:
 
-    # Secuencia oficial de estados de una orden de servicio.
-    ESTADOS_ORDEN = ["espera", "proceso", "terminado", "entregado"]
+    # Orden válido de transición. No se puede saltar estados ni retroceder.
+    FLUJO_ESTADOS = ["espera", "proceso", "terminado", "entregado"]
 
     # ---------- Catálogo de servicios ----------
 
@@ -33,29 +33,6 @@ class ServiciosLogica:
         return ServiciosDatos.insertar_servicio(nombre, precio)
 
     @staticmethod
-    def editar_servicio(servicio_id, nombre, precio):
-        nombre = (nombre or "").strip()
-        if not nombre:
-            raise ValueError("El nombre del servicio es obligatorio.")
-
-        try:
-            precio = float(precio)
-        except (TypeError, ValueError):
-            raise ValueError("El precio debe ser un número válido.")
-
-        if precio <= 0:
-            raise ValueError("El precio del servicio debe ser mayor a cero.")
-
-        if ServiciosDatos.obtener_servicio_por_id(servicio_id) is None:
-            raise ValueError("El servicio no existe.")
-
-        existente = ServiciosDatos.obtener_servicio_por_nombre(nombre)
-        if existente is not None and existente["id"] != servicio_id:
-            raise ValueError("Ya existe otro servicio con ese nombre.")
-
-        ServiciosDatos.actualizar_servicio(servicio_id, nombre, precio)
-
-    @staticmethod
     def listar_servicios():
         return ServiciosDatos.listar_servicios(solo_activos=True)
 
@@ -67,7 +44,6 @@ class ServiciosLogica:
 
     @staticmethod
     def crear_catalogo_por_defecto_si_no_existe():
-        """Crea un catálogo básico de servicios si la tabla está vacía."""
         if ServiciosDatos.contar_servicios() == 0:
             ServiciosLogica.registrar_servicio("Lavado básico", 15000)
             ServiciosLogica.registrar_servicio("Lavado completo", 25000)
@@ -78,6 +54,11 @@ class ServiciosLogica:
 
     @staticmethod
     def asignar_servicios(vehiculo_id, servicio_ids, empleado_id=None):
+        """
+        Crea una orden de servicio para un vehículo con uno o varios servicios.
+        La orden nace en estado 'espera'. El empleado es opcional en este punto:
+        puede asignarse ahora o más adelante, al avanzar de estado.
+        """
         if not vehiculo_id:
             raise ValueError("Debe indicar el vehículo al que se le asignará el servicio.")
 
@@ -86,6 +67,11 @@ class ServiciosLogica:
 
         if not servicio_ids:
             raise ValueError("Debe seleccionar al menos un servicio.")
+
+        if empleado_id is not None:
+            empleado = EmpleadosDatos.obtener_empleado_por_id(empleado_id)
+            if empleado is None or empleado["activo"] != 1:
+                raise ValueError("El empleado seleccionado no existe o no está activo.")
 
         servicio_ids = list(dict.fromkeys(servicio_ids))
 
@@ -98,16 +84,9 @@ class ServiciosLogica:
             items.append((servicio_id, servicio["precio"]))
             total += servicio["precio"]
 
-        if empleado_id is not None:
-            empleado = EmpleadosDatos.obtener_empleado_por_id(empleado_id)
-            if empleado is None or empleado["activo"] != 1:
-                raise ValueError("El empleado seleccionado no existe o no está activo.")
-
         fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        return OrdenesDatos.crear_orden_con_detalle(
-            vehiculo_id, fecha_hora, total, items, empleado_id=empleado_id
-        )
+        return OrdenesDatos.crear_orden_con_detalle(vehiculo_id, fecha_hora, total, items, empleado_id)
 
     @staticmethod
     def obtener_orden(orden_id):
@@ -118,56 +97,66 @@ class ServiciosLogica:
         return orden
 
     @staticmethod
-    def listar_ordenes(estado=None):
-        return OrdenesDatos.listar_ordenes(estado=estado)
+    def listar_ordenes(solo_activas=False):
+        """
+        solo_activas=True devuelve solo las que no han llegado a 'entregado'
+        (es decir, las que siguen en curso dentro del lavadero).
+        """
+        return OrdenesDatos.listar_ordenes(solo_activas=solo_activas)
 
-    @staticmethod
-    def listar_ordenes_pendientes():
-        return OrdenesDatos.listar_ordenes(estado="espera")
+    # ---------- Cambio de estado (espera -> proceso -> terminado -> entregado) ----------
 
     @staticmethod
     def siguiente_estado(estado_actual):
-        indice_actual = ServiciosLogica.ESTADOS_ORDEN.index(estado_actual)
-        if indice_actual == len(ServiciosLogica.ESTADOS_ORDEN) - 1:
+        """
+        Devuelve el siguiente estado válido en el flujo, o None si ya
+        está en el último estado ('entregado').
+        """
+        try:
+            posicion = ServiciosLogica.FLUJO_ESTADOS.index(estado_actual)
+        except ValueError:
+            raise ValueError(f"Estado desconocido: {estado_actual}")
+
+        if posicion == len(ServiciosLogica.FLUJO_ESTADOS) - 1:
             return None
-        return ServiciosLogica.ESTADOS_ORDEN[indice_actual + 1]
+        return ServiciosLogica.FLUJO_ESTADOS[posicion + 1]
 
     @staticmethod
     def cambiar_estado_orden(orden_id, nuevo_estado, empleado_id=None):
+        """
+        Avanza una orden al siguiente estado del flujo, validando que no se
+        salten estados y que no se retroceda.
+        Si la orden todavía no tiene empleado asignado, se debe indicar uno.
+        """
         orden = OrdenesDatos.obtener_orden_por_id(orden_id)
         if orden is None:
             raise ValueError("La orden de servicio no existe.")
 
-        if nuevo_estado not in ServiciosLogica.ESTADOS_ORDEN:
-            raise ValueError(
-                f"Estado inválido '{nuevo_estado}'. "
-                f"Los estados válidos son: {', '.join(ServiciosLogica.ESTADOS_ORDEN)}."
-            )
-
         estado_actual = orden["estado"]
-        indice_actual = ServiciosLogica.ESTADOS_ORDEN.index(estado_actual)
-        indice_nuevo = ServiciosLogica.ESTADOS_ORDEN.index(nuevo_estado)
 
-        if indice_nuevo != indice_actual + 1:
-            siguiente = ServiciosLogica.siguiente_estado(estado_actual)
-            if siguiente is None:
-                raise ValueError("Esta orden ya fue entregada y no puede cambiar de estado.")
+        if estado_actual == "entregado":
+            raise ValueError("Esta orden ya fue entregada y no puede cambiar de estado.")
+
+        if nuevo_estado not in ServiciosLogica.FLUJO_ESTADOS:
+            raise ValueError(f"'{nuevo_estado}' no es un estado válido.")
+
+        posicion_actual = ServiciosLogica.FLUJO_ESTADOS.index(estado_actual)
+        posicion_nueva = ServiciosLogica.FLUJO_ESTADOS.index(nuevo_estado)
+
+        if posicion_nueva != posicion_actual + 1:
             raise ValueError(
-                f"No se puede pasar de '{estado_actual}' a '{nuevo_estado}'. "
-                f"El único siguiente estado válido es '{siguiente}'."
+                f"No se puede pasar de '{estado_actual}' a '{nuevo_estado}' "
+                f"directamente. El siguiente estado válido es "
+                f"'{ServiciosLogica.FLUJO_ESTADOS[posicion_actual + 1]}'."
             )
 
-        empleado_responsable_id = empleado_id if empleado_id is not None else orden["empleado_id"]
-
-        if nuevo_estado == "proceso" and not empleado_responsable_id:
-            raise ValueError(
-                "Debe asignar un empleado responsable antes de pasar la orden a 'proceso'."
-            )
-
-        if empleado_id is not None:
+        empleado_final = orden["empleado_id"]
+        if empleado_final is None:
+            if not empleado_id:
+                raise ValueError("Debe indicar el empleado responsable antes de continuar.")
             empleado = EmpleadosDatos.obtener_empleado_por_id(empleado_id)
             if empleado is None or empleado["activo"] != 1:
                 raise ValueError("El empleado seleccionado no existe o no está activo.")
-            OrdenesDatos.asignar_empleado(orden_id, empleado_id)
+            empleado_final = empleado_id
 
-        OrdenesDatos.actualizar_estado(orden_id, nuevo_estado)
+        OrdenesDatos.actualizar_estado(orden_id, nuevo_estado, empleado_final)

@@ -55,10 +55,10 @@ class EmpleadosScreen(ctk.CTkFrame):
             messagebox.showwarning("Advertencia", "El nombre del empleado es obligatorio.")
             return
 
-        exito, msg = EmpleadosLogica.crear_empleado(nombre)
-        if exito:
-            messagebox.showinfo("Éxito", msg)
+        try:
+            EmpleadosLogica.registrar_empleado(nombre)
+            messagebox.showinfo("Éxito", "Empleado registrado correctamente.")
             self.txt_nombre.delete(0, "end")
             self._cargar_empleados()
-        else:
-            messagebox.showerror("Error", msg)
+        except ValueError as err:
+            messagebox.showerror("Error", str(err))

@@ -5,14 +5,6 @@ class OrdenesDatos:
 
     @staticmethod
     def crear_orden_con_detalle(vehiculo_id, fecha_hora, total, items, empleado_id=None):
-        """
-        Crea la orden de servicio y su detalle en una sola transacción.
-        items: lista de tuplas (servicio_id, precio_aplicado).
-        empleado_id: opcional, por si ya se conoce al empleado responsable
-        desde el momento de la asignación.
-        La orden nace en estado 'espera'.
-        Devuelve el id de la orden creada.
-        """
         conexion = obtener_conexion()
         cursor = conexion.cursor()
         try:
@@ -81,16 +73,11 @@ class OrdenesDatos:
         return filas
 
     @staticmethod
-    def listar_ordenes(estado=None):
-        """
-        Si 'estado' se indica (p.ej. 'espera', 'proceso', 'terminado', 'entregado'),
-        filtra solo por ese estado; si es None, trae todas.
-        """
+    def listar_ordenes(solo_activas=False):
         conexion = obtener_conexion()
         conexion.row_factory = OrdenesDatos._dict_factory
         cursor = conexion.cursor()
-        condicion = "WHERE o.estado = ?" if estado else ""
-        parametros = (estado,) if estado else ()
+        condicion = "WHERE o.estado != 'entregado'" if solo_activas else ""
         cursor.execute(f"""
             SELECT o.id, o.vehiculo_id, o.empleado_id, o.fecha_hora, o.total, o.estado,
                    v.placa, e.nombre AS nombre_empleado
@@ -99,39 +86,22 @@ class OrdenesDatos:
             LEFT JOIN empleados e ON e.id = o.empleado_id
             {condicion}
             ORDER BY o.id DESC
-        """, parametros)
+        """)
         filas = cursor.fetchall()
         conexion.close()
         return filas
 
     @staticmethod
-    def actualizar_estado(orden_id, nuevo_estado):
-        """
-        Actualiza únicamente el campo 'estado' de la orden.
-        No valida nada de negocio: eso lo hace ServiciosLogica.cambiar_estado_orden.
-        """
+    def actualizar_estado(orden_id, nuevo_estado, empleado_id):
         conexion = obtener_conexion()
         cursor = conexion.cursor()
         cursor.execute(
-            "UPDATE ordenes_servicio SET estado = ? WHERE id = ?",
-            (nuevo_estado, orden_id),
-        )
-        filas_afectadas = cursor.rowcount
-        conexion.commit()
-        conexion.close()
-        return filas_afectadas > 0
-
-    @staticmethod
-    def asignar_empleado(orden_id, empleado_id):
-        """
-        Actualiza únicamente el empleado responsable de la orden.
-        No valida nada de negocio: eso lo hace la capa de lógica.
-        """
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
-        cursor.execute(
-            "UPDATE ordenes_servicio SET empleado_id = ? WHERE id = ?",
-            (empleado_id, orden_id),
+            """
+            UPDATE ordenes_servicio
+            SET estado = ?, empleado_id = ?
+            WHERE id = ?
+            """,
+            (nuevo_estado, empleado_id, orden_id),
         )
         filas_afectadas = cursor.rowcount
         conexion.commit()

@@ -62,7 +62,7 @@ class VehiculosScreen(ctk.CTkFrame):
 
     def _cargar_clientes(self):
         try:
-            clientes = ClientesLogica.obtener_vehiculos()
+            clientes = ClientesLogica.listar_todos_los_clientes()
             if clientes:
                 opciones = [f"{c['id']} - {c['nombre']}" for c in clientes]
                 self.cb_clientes.configure(values=opciones)
@@ -79,7 +79,10 @@ class VehiculosScreen(ctk.CTkFrame):
         try:
             vehiculos = VehiculosLogica.obtener_vehiculos()
             for v in vehiculos:
-                self.tabla.insert("", "end", values=(v.get("id"), v.get("placa"), v.get("marca", ""), v.get("modelo", ""), v.get("tipo_vehiculo"), v.get("cliente_nombre", "")))
+                self.tabla.insert("", "end", values=(
+                    v.get("id"), v.get("placa"), v.get("marca", ""),
+                    v.get("modelo", ""), v.get("tipo_vehiculo"), v.get("nombre_cliente", "")
+                ))
         except Exception as e:
             print(f"Error al cargar vehículos: {e}")
 
@@ -99,12 +102,12 @@ class VehiculosScreen(ctk.CTkFrame):
         modelo = self.txt_modelo.get().strip()
         tipo = self.cb_tipo.get()
 
-        exito, msg = VehiculosLogica.crear_vehiculo(placa, marca, modelo, tipo, cliente_id)
-        if exito:
-            messagebox.showinfo("Éxito", msg)
+        try:
+            VehiculosLogica.registrar_vehiculo(placa, tipo, cliente_id, marca, modelo)
+            messagebox.showinfo("Éxito", "Vehículo registrado correctamente.")
             self.txt_placa.delete(0, "end")
             self.txt_marca.delete(0, "end")
             self.txt_modelo.delete(0, "end")
             self._cargar_vehiculos()
-        else:
-            messagebox.showerror("Error", msg)
+        except ValueError as err:
+            messagebox.showerror("Error", str(err))
