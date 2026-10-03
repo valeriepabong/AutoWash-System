@@ -4,6 +4,7 @@ from datos.servicios_datos import ServiciosDatos
 from datos.ordenes_datos import OrdenesDatos
 from datos.vehiculos_datos import VehiculosDatos
 from datos.empleados_datos import EmpleadosDatos
+from logica.inventario_logica import InventarioLogica
 
 
 class ServiciosLogica:
@@ -33,6 +34,29 @@ class ServiciosLogica:
         return ServiciosDatos.insertar_servicio(nombre, precio)
 
     @staticmethod
+    def editar_servicio(servicio_id, nombre, precio):
+        nombre = (nombre or "").strip()
+        if not nombre:
+            raise ValueError("El nombre del servicio es obligatorio.")
+
+        try:
+            precio = float(precio)
+        except (TypeError, ValueError):
+            raise ValueError("El precio debe ser un número válido.")
+
+        if precio <= 0:
+            raise ValueError("El precio del servicio debe ser mayor a cero.")
+
+        if ServiciosDatos.obtener_servicio_por_id(servicio_id) is None:
+            raise ValueError("El servicio no existe.")
+
+        existente = ServiciosDatos.obtener_servicio_por_nombre(nombre)
+        if existente is not None and existente["id"] != servicio_id:
+            raise ValueError("Ya existe otro servicio con ese nombre.")
+
+        ServiciosDatos.actualizar_servicio(servicio_id, nombre, precio)
+
+    @staticmethod
     def listar_servicios():
         return ServiciosDatos.listar_servicios(solo_activos=True)
 
@@ -58,6 +82,9 @@ class ServiciosLogica:
         Crea una orden de servicio para un vehículo con uno o varios servicios.
         La orden nace en estado 'espera'. El empleado es opcional en este punto:
         puede asignarse ahora o más adelante, al avanzar de estado.
+        Antes de crear la orden valida que haya stock suficiente de los
+        insumos que consumen los servicios elegidos, y al crearla descuenta
+        ese inventario automáticamente.
         """
         if not vehiculo_id:
             raise ValueError("Debe indicar el vehículo al que se le asignará el servicio.")
@@ -84,9 +111,15 @@ class ServiciosLogica:
             items.append((servicio_id, servicio["precio"]))
             total += servicio["precio"]
 
+        InventarioLogica.validar_stock_suficiente(servicio_ids)
+
         fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        return OrdenesDatos.crear_orden_con_detalle(vehiculo_id, fecha_hora, total, items, empleado_id)
+        orden_id = OrdenesDatos.crear_orden_con_detalle(vehiculo_id, fecha_hora, total, items, empleado_id)
+
+        InventarioLogica.descontar_insumos_de_servicios(servicio_ids, orden_id, fecha_hora)
+
+        return orden_id
 
     @staticmethod
     def obtener_orden(orden_id):

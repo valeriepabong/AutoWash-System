@@ -1,16 +1,13 @@
 import os
 import sqlite3
+from sqlite3 import Connection
 
 
-def obtener_conexion():
+def obtener_conexion() -> Connection:
     db_path = os.path.join(os.path.dirname(__file__), "autowash.db")
     conexion = sqlite3.connect(db_path)
     conexion.execute("PRAGMA foreign_keys = ON")
     return conexion
-
-
-def _crear_insumos_por_defecto():
-    pass
 
 
 def inicializar_db():
@@ -149,7 +146,7 @@ def inicializar_db():
 def _migrar_estados_legacy():
     """
     Compatibilidad con bases de datos creadas antes de este sprint, cuando
-    'ordenes_servicio.estado' solo tenía 'pendiente' / 'finalizado'.
+    'ordenes_servicio. Estado' solo tenía 'pendiente' / 'finalizado'.
     Si alguien ya tiene un autowash.db con esos valores, los actualiza a la
     nueva nomenclatura de 4 estados en vez de dejarlos "atascados".
     """
@@ -172,7 +169,8 @@ def _crear_servicios_por_defecto():
     from logica.servicios_logica import ServiciosLogica
     ServiciosLogica.crear_catalogo_por_defecto_si_no_existe()
 
-    def _crear_insumos_por_defecto(InventarioLogica=None):
-        """Crea un catálogo básico de insumos y sus recetas por servicio, si la tabla está vacía."""
-        from logica.inventario_logica import InventarioLogica
-        InventarioLogica.crear_catalogo_por_defecto_si_no_existe()
+
+def _crear_insumos_por_defecto():
+    """Crea un catálogo básico de insumos y sus recetas por servicio, si la tabla está vacía."""
+    from logica.inventario_logica import InventarioLogica
+    InventarioLogica.crear_catalogo_por_defecto_si_no_existe()
