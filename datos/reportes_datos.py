@@ -1,13 +1,13 @@
 from db.conexion import obtener_conexion
 
 
-class Reportes_Datos:
+class ReportesDatos:
 
     @staticmethod
     def ingresos_por_dia(fecha_desde, fecha_hasta):
 
         conexion = obtener_conexion()
-        conexion.row_factory = Reportes_Datos._dict_factory
+        conexion.row_factory = ReportesDatos._dict_factory
         cursor = conexion.cursor()
         cursor.execute(
             """
@@ -29,7 +29,7 @@ class Reportes_Datos:
     def servicios_mas_solicitados(fecha_desde, fecha_hasta, limite=None):
 
         conexion = obtener_conexion()
-        conexion.row_factory = Reportes_Datos._dict_factory
+        conexion.row_factory = ReportesDatos._dict_factory
         cursor = conexion.cursor()
 
         consulta = """
@@ -63,7 +63,7 @@ class Reportes_Datos:
         reposicion de stock, no consumo).
         """
         conexion = obtener_conexion()
-        conexion.row_factory = Reportes_Datos._dict_factory
+        conexion.row_factory = ReportesDatos._dict_factory
         cursor = conexion.cursor()
         cursor.execute(
             """
