@@ -113,11 +113,12 @@ class ServiciosLogica:
 
         InventarioLogica.validar_stock_suficiente(servicio_ids)
 
+        consumo_total = InventarioLogica._calcular_consumo_total(servicio_ids)
         fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        orden_id = OrdenesDatos.crear_orden_con_detalle(vehiculo_id, fecha_hora, total, items, empleado_id)
-
-        InventarioLogica.descontar_insumos_de_servicios(servicio_ids, orden_id, fecha_hora)
+        orden_id = OrdenesDatos.crear_orden_con_detalle_y_movimientos(
+            vehiculo_id, fecha_hora, total, items, consumo_total, empleado_id=empleado_id
+        )
 
         return orden_id
 

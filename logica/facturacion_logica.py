@@ -51,6 +51,30 @@ class FacturacionLogica:
         factura["detalle"] = OrdenesDatos.obtener_detalle_de_orden(factura["orden_id"])
         return factura
 
+
+    @staticmethod
+    def listar_ordenes_por_facturar():
+        """
+        Devuelve la lista de ordenes entregadas que aun no tienen factura.
+        Usa una sola consulta SQL (sin N+1) delegando en FacturacionDatos.
+        Claves de cada dict: id, vehiculo_id, placa, nombre_cliente,
+                             fecha_hora, total, estado.
+        Ordenado de mas reciente a mas antiguo.
+        """
+        return FacturacionDatos.listar_ordenes_entregadas_sin_factura()
+
+    @staticmethod
+    def obtener_detalle_orden(orden_id):
+        """
+        Devuelve el detalle de servicios de una orden (lista de dicts).
+        Claves: id, servicio_id, precio_aplicado, nombre_servicio.
+        Lanza ValueError si la orden no existe.
+        """
+        orden = OrdenesDatos.obtener_orden_por_id(orden_id)
+        if orden is None:
+            raise ValueError("La orden de servicio no existe.")
+        return OrdenesDatos.obtener_detalle_de_orden(orden_id)
+
     @staticmethod
     def obtener_factura_por_orden(orden_id):
         return FacturacionDatos.obtener_factura_por_orden(orden_id)

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from datos.Reportes_Datos import Reportes_Datos
+from datos.reportes_datos import ReportesDatos
 
 
 class ReportesLogica:
@@ -68,7 +68,7 @@ class ReportesLogica:
     @staticmethod
     def reporte_ingresos(fecha_desde=None, fecha_hasta=None):
         desde, hasta = ReportesLogica.validar_rango(fecha_desde, fecha_hasta)
-        datos = Reportes_Datos.ingresos_por_dia(desde, hasta)
+        datos = ReportesDatos.ingresos_por_dia(desde, hasta)
 
         filas = [
             {
@@ -119,7 +119,7 @@ class ReportesLogica:
                 raise ValueError("El limite debe ser mayor a cero.")
 
         desde, hasta = ReportesLogica.validar_rango(fecha_desde, fecha_hasta)
-        datos = Reportes_Datos.servicios_mas_solicitados(desde, hasta, limite)
+        datos = ReportesDatos.servicios_mas_solicitados(desde, hasta, limite)
 
         filas = [
             {
@@ -151,7 +151,7 @@ class ReportesLogica:
     @staticmethod
     def reporte_consumo_insumos(fecha_desde=None, fecha_hasta=None):
         desde, hasta = ReportesLogica.validar_rango(fecha_desde, fecha_hasta)
-        datos = Reportes_Datos.consumo_de_insumos(desde, hasta)
+        datos = ReportesDatos.consumo_de_insumos(desde, hasta)
 
         filas = [
             {

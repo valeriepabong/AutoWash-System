@@ -77,6 +77,36 @@ class FacturacionDatos:
         conexion.close()
         return filas
 
+
+    @staticmethod
+    def listar_ordenes_entregadas_sin_factura():
+        """
+        Devuelve las ordenes con estado 'entregado' que aun no tienen factura,
+        usando una sola consulta con LEFT JOIN (sin consultas N+1).
+        Claves devueltas: id, vehiculo_id, placa, nombre_cliente,
+                          fecha_hora, total, estado.
+        Ordenadas de mas reciente a mas antigua.
+        """
+        conexion = obtener_conexion()
+        conexion.row_factory = FacturacionDatos._dict_factory
+        cursor = conexion.cursor()
+        cursor.execute(
+            """
+            SELECT o.id, o.vehiculo_id, v.placa,
+                   c.nombre AS nombre_cliente,
+                   o.fecha_hora, o.total, o.estado
+            FROM ordenes_servicio o
+            JOIN vehiculos v ON v.id = o.vehiculo_id
+            JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN facturas f ON f.orden_id = o.id
+            WHERE o.estado = 'entregado' AND f.id IS NULL
+            ORDER BY o.fecha_hora DESC
+            """
+        )
+        filas = cursor.fetchall()
+        conexion.close()
+        return filas
+
     @staticmethod
     def _dict_factory(cursor, fila):
         columnas = [descripcion[0] for descripcion in cursor.description]
