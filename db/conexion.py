@@ -1,10 +1,43 @@
 import os
+import sys
 import sqlite3
 from sqlite3 import Connection
 
 
+def obtener_ruta_db() -> str:
+    """
+    Calcula la ruta de la base de datos en tiempo de ejecucion con esta prioridad:
+    1) Variable de entorno AUTOWASH_DB (para pruebas y demos).
+    2) Ejecutable empaquetado (sys.frozen == True): carpeta de datos del usuario.
+       - Windows: %LOCALAPPDATA%\\AutoWash\\autowash.db
+       - Otros:   ~/.autowash/autowash.db
+    3) Desarrollo: db/autowash.db junto al codigo fuente (comportamiento original).
+    La ruta se calcula al LLAMAR la funcion, nunca al importar el modulo.
+    """
+    # Prioridad 1: variable de entorno (pruebas y demos)
+    ruta_env = os.environ.get("AUTOWASH_DB")
+    if ruta_env:
+        directorio = os.path.dirname(ruta_env)
+        if directorio:
+            os.makedirs(directorio, exist_ok=True)
+        return ruta_env
+
+    # Prioridad 2: ejecutable PyInstaller (sys.frozen = True)
+    if getattr(sys, "frozen", False):
+        if sys.platform.startswith("win"):
+            base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+            carpeta = os.path.join(base, "AutoWash")
+        else:
+            carpeta = os.path.join(os.path.expanduser("~"), ".autowash")
+        os.makedirs(carpeta, exist_ok=True)
+        return os.path.join(carpeta, "autowash.db")
+
+    # Prioridad 3: desarrollo, junto al codigo fuente
+    return os.path.join(os.path.dirname(__file__), "autowash.db")
+
+
 def obtener_conexion() -> Connection:
-    db_path = os.path.join(os.path.dirname(__file__), "autowash.db")
+    db_path = obtener_ruta_db()
     conexion = sqlite3.connect(db_path)
     conexion.execute("PRAGMA foreign_keys = ON")
     return conexion
