@@ -129,15 +129,18 @@ class InventarioDatos:
     # ---------- Movimientos de inventario (entradas / salidas) ----------
 
     @staticmethod
-    def registrar_movimiento(insumo_id, tipo_movimiento, cantidad, fecha_hora, orden_id=None, motivo=None):
+    def registrar_movimiento(insumo_id, tipo_movimiento, cantidad, fecha_hora, orden_id=None, motivo=None, conexion=None):
         """
         Registra un movimiento de inventario y actualiza stock_actual del
         insumo EN LA MISMA TRANSACCIÓN, para que nunca quede un movimiento
         guardado sin reflejarse en el stock (o viceversa).
         tipo_movimiento: 'entrada' suma al stock, 'salida' resta del stock.
+        Si conexion es provista, no hace commit ni close (gestión externa).
         Devuelve el nuevo stock_actual.
         """
-        conexion = obtener_conexion()
+        propia = conexion is None
+        if propia:
+            conexion = obtener_conexion()
         cursor = conexion.cursor()
         try:
             cursor.execute("SELECT stock_actual FROM insumos WHERE id = ?", (insumo_id,))
@@ -164,13 +167,16 @@ class InventarioDatos:
                 (insumo_id, tipo_movimiento, cantidad, fecha_hora, orden_id, motivo),
             )
 
-            conexion.commit()
+            if propia:
+                conexion.commit()
             return nuevo_stock
         except Exception:
-            conexion.rollback()
+            if propia:
+                conexion.rollback()
             raise
         finally:
-            conexion.close()
+            if propia:
+                conexion.close()
 
     @staticmethod
     def listar_movimientos(insumo_id=None):

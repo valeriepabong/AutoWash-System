@@ -4,8 +4,10 @@ from db.conexion import obtener_conexion
 class OrdenesDatos:
 
     @staticmethod
-    def crear_orden_con_detalle(vehiculo_id, fecha_hora, total, items, empleado_id=None):
-        conexion = obtener_conexion()
+    def crear_orden_con_detalle(vehiculo_id, fecha_hora, total, items, empleado_id=None, conexion=None):
+        propia = conexion is None
+        if propia:
+            conexion = obtener_conexion()
         cursor = conexion.cursor()
         try:
             cursor.execute(
@@ -24,6 +26,65 @@ class OrdenesDatos:
                     VALUES (?, ?, ?)
                     """,
                     (orden_id, servicio_id, precio_aplicado),
+                )
+
+            if propia:
+                conexion.commit()
+            return orden_id
+        except Exception:
+            if propia:
+                conexion.rollback()
+            raise
+        finally:
+            if propia:
+                conexion.close()
+
+    @staticmethod
+    def crear_orden_con_detalle_y_movimientos(
+        vehiculo_id, fecha_hora, total, items, consumo_insumos, empleado_id=None
+    ):
+        """
+        Crea la orden con su detalle y registra los movimientos de salida de insumos
+        en UNA SOLA transacción atómica (misma conexión y commit).
+        Revalida el stock dentro de la transacción.
+        Ante cualquier excepción realiza un rollback total.
+        """
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        try:
+            # 1. Revalidar stock dentro de la transacción
+            for insumo_id, cantidad_requerida in consumo_insumos.items():
+                cursor.execute(
+                    "SELECT nombre, unidad_medida, stock_actual FROM insumos WHERE id = ?",
+                    (insumo_id,),
+                )
+                fila = cursor.fetchone()
+                if fila is None:
+                    continue
+                nombre, unidad, stock_actual = fila[0], fila[1], fila[2]
+                if stock_actual < cantidad_requerida:
+                    raise ValueError(
+                        f"Stock insuficiente de '{nombre}': se necesitan "
+                        f"{cantidad_requerida} {unidad} y solo hay "
+                        f"{stock_actual} {unidad} disponibles."
+                    )
+
+            # 2. Insertar orden y detalles usando la conexión compartida
+            orden_id = OrdenesDatos.crear_orden_con_detalle(
+                vehiculo_id, fecha_hora, total, items, empleado_id=empleado_id, conexion=conexion
+            )
+
+            # 3. Registrar salidas de inventario usando la misma conexión
+            from datos.inventario_datos import InventarioDatos
+            for insumo_id, cantidad_requerida in consumo_insumos.items():
+                InventarioDatos.registrar_movimiento(
+                    insumo_id,
+                    "salida",
+                    cantidad_requerida,
+                    fecha_hora,
+                    orden_id=orden_id,
+                    motivo=f"Consumo automático de la orden #{orden_id}",
+                    conexion=conexion,
                 )
 
             conexion.commit()
