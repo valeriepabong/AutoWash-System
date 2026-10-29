@@ -1,20 +1,32 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
 import os
 import subprocess
 import sys
 
+import customtkinter as ctk
+from tkinter import ttk, messagebox
+
 from logica.facturacion_logica import FacturacionLogica
 from logica.pdf_factura import generar_pdf_factura
-from datos.ordenes_datos import OrdenesDatos
-from datos.facturacion_datos import FacturacionDatos
 
 
-class FacturacionScreen(ttk.Frame):
+class FacturacionScreen(ctk.CTkFrame):
+    """
+    Pantalla de Facturación (S5-07).
+
+    Usa exactamente los dos métodos que definió backend para esta tarea:
+        FacturacionLogica.listar_ordenes_por_facturar()
+            -> [{id, vehiculo_id, placa, nombre_cliente, fecha_hora, total, estado}]
+        FacturacionLogica.obtener_detalle_orden(orden_id)
+            -> [{id, servicio_id, precio_aplicado, nombre_servicio}]
+    y para generar el comprobante:
+        FacturacionLogica.generar_factura(orden_id, metodo_pago) -> id de la factura
+        FacturacionLogica.obtener_factura(factura_id) -> dict con todo lo que pide el PDF
+    """
+
     def __init__(self, parent, al_volver=None):
         super().__init__(parent)
         self.al_volver = al_volver
-        self.pack(fill="both", expand=True, padx=10, pady=10)
+        self.pack(fill="both", expand=True, padx=20, pady=20)
 
         self.ordenes_map = {}
         self.orden_seleccionada_id = None
@@ -23,100 +35,89 @@ class FacturacionScreen(ttk.Frame):
         self.cargar_ordenes_pendientes()
 
     def _crear_interfaz(self):
-        header_frame = ttk.Frame(self)
-        header_frame.pack(fill="x", pady=5)
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 10))
 
-        ttk.Label(
-            header_frame, text="Módulo de Facturación", font=("Arial", 16, "bold")
+        ctk.CTkLabel(
+            header_frame, text="Módulo de Facturación", font=ctk.CTkFont(size=22, weight="bold")
         ).pack(side="left")
 
         if self.al_volver:
-            btn_volver = ttk.Button(
-                header_frame, text="Volver al Dashboard", command=self.al_volver
-            )
-            btn_volver.pack(side="right", padx=10)
+            ctk.CTkButton(
+                header_frame, text="Volver al Dashboard", command=self.al_volver, width=150
+            ).pack(side="right")
 
-        frame_orden = ttk.LabelFrame(self, text="Selección de Orden Entregada")
-        frame_orden.pack(fill="x", pady=5, ipady=5)
+        frame_orden = ctk.CTkFrame(self)
+        frame_orden.pack(fill="x", pady=5, padx=5, ipady=5)
 
-        ttk.Label(frame_orden, text="Órdenes listos para facturar:").grid(
-            row=0, column=0, padx=5, pady=5
+        ctk.CTkLabel(frame_orden, text="Órdenes listas para facturar:").grid(
+            row=0, column=0, padx=10, pady=10
         )
 
-        self.combo_ordenes = ttk.Combobox(frame_orden, state="readonly", width=45)
-        self.combo_ordenes.grid(row=0, column=1, padx=5, pady=5)
-        self.combo_ordenes.bind("<<ComboboxSelected>>", self._al_seleccionar_orden)
-
-        btn_refrescar = ttk.Button(
-            frame_orden, text="🔄 Recargar", command=self.cargar_ordenes_pendientes
+        self.combo_ordenes = ctk.CTkComboBox(
+            frame_orden, state="readonly", width=350, command=self._al_seleccionar_orden
         )
-        btn_refrescar.grid(row=0, column=2, padx=5, pady=5)
+        self.combo_ordenes.grid(row=0, column=1, padx=10, pady=10)
 
-        ttk.Label(
-            self, text="Detalle de Servicios:", font=("Arial", 11, "bold")
-        ).pack(anchor="w", pady=(10, 2))
+        ctk.CTkButton(
+            frame_orden, text="Recargar", width=90, command=self.cargar_ordenes_pendientes
+        ).grid(row=0, column=2, padx=10, pady=10)
+
+        ctk.CTkLabel(
+            self, text="Detalle de servicios:", font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(anchor="w", pady=(15, 5), padx=5)
 
         columnas = ("servicio", "precio")
         self.tree_detalle = ttk.Treeview(self, columns=columnas, show="headings", height=6)
         self.tree_detalle.heading("servicio", text="Servicio")
-        self.tree_detalle.heading("precio", text="Precio Aplicado ($)")
-        self.tree_detalle.column("servicio", width=250, anchor="w")
-        self.tree_detalle.column("precio", width=100, anchor="e")
-        self.tree_detalle.pack(fill="both", expand=True, pady=5)
+        self.tree_detalle.heading("precio", text="Precio aplicado")
+        self.tree_detalle.column("servicio", width=300, anchor="w")
+        self.tree_detalle.column("precio", width=120, anchor="e")
+        self.tree_detalle.pack(fill="both", expand=True, pady=5, padx=5)
 
-        frame_pago = ttk.Frame(self)
-        frame_pago.pack(fill="x", pady=10)
+        frame_pago = ctk.CTkFrame(self, fg_color="transparent")
+        frame_pago.pack(fill="x", pady=10, padx=5)
 
-        self.lbl_total = ttk.Label(
-            frame_pago, text="Total a Pagar: $0.00", font=("Arial", 12, "bold")
+        self.label_total = ctk.CTkLabel(
+            frame_pago, text="Total a pagar: $0", font=ctk.CTkFont(size=16, weight="bold")
         )
-        self.lbl_total.pack(side="left", padx=5)
+        self.label_total.pack(side="left", padx=5)
 
-        btn_facturar = ttk.Button(
-            frame_pago, text="💳 Generar Comprobante", command=self._generar_comprobante,
-        )
-        btn_facturar.pack(side="right", padx=5)
-
-        ttk.Label(frame_pago, text="Método de Pago:").pack(side="right", padx=2)
-
-        self.combo_metodo = ttk.Combobox(
-            frame_pago, state="readonly",
-            values=["Efectivo", "Tarjeta", "Transferencia"], width=15,
+        ctk.CTkLabel(frame_pago, text="Método de pago:").pack(side="left", padx=(30, 5))
+        self.combo_metodo = ctk.CTkComboBox(
+            frame_pago, state="readonly", values=["Efectivo", "Tarjeta", "Transferencia"], width=140
         )
         self.combo_metodo.set("Efectivo")
-        self.combo_metodo.pack(side="right", padx=5)
+        self.combo_metodo.pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            frame_pago, text="Generar Comprobante", command=self._generar_comprobante, fg_color="green"
+        ).pack(side="right", padx=5)
+
+    # ---------- Carga de datos ----------
 
     def cargar_ordenes_pendientes(self):
         try:
-            ordenes = OrdenesDatos.listar_ordenes(solo_activas=False)
-            ordenes_pendientes = [
-                o
-                for o in ordenes
-                if o["estado"] == "entregado"
-                and FacturacionDatos.obtener_factura_por_orden(o["id"]) is None
-            ]
-
-            self.ordenes_map.clear()
-            opciones = []
-
-            for o in ordenes_pendientes:
-                texto = f"Orden #{o['id']} - Placa: {o['placa']} ({o['fecha_hora']})"
-                self.ordenes_map[texto] = o["id"]
-                opciones.append(texto)
-
-            self.combo_ordenes["values"] = opciones
-            self.combo_ordenes.set("")
-            self.orden_seleccionada_id = None
-            self._limpiar_detalle()
-
-            if not opciones:
-                self.combo_ordenes.set("No hay órdenes pendientes por facturar")
-
+            ordenes = FacturacionLogica.listar_ordenes_por_facturar()
         except Exception as e:
-            messagebox.showerror("Error", f"Error al consultar órdenes pendientes:\n{e}")
+            messagebox.showerror("Error", f"No se pudieron consultar las órdenes pendientes:\n{e}")
+            return
 
-    def _al_seleccionar_orden(self, event=None):
-        seleccion = self.combo_ordenes.get()
+        self.ordenes_map.clear()
+        opciones = []
+        for o in ordenes:
+            texto = f"Orden #{o['id']} - {o['placa']} - {o['nombre_cliente']} (${o['total']:,.0f})"
+            self.ordenes_map[texto] = o["id"]
+            opciones.append(texto)
+
+        self.combo_ordenes.configure(values=opciones or ["Sin órdenes pendientes"])
+        self.combo_ordenes.set(opciones[0] if opciones else "Sin órdenes pendientes")
+        self.orden_seleccionada_id = self.ordenes_map[opciones[0]] if opciones else None
+        self._limpiar_detalle()
+        if self.orden_seleccionada_id:
+            self._cargar_detalle_orden(self.orden_seleccionada_id)
+
+    def _al_seleccionar_orden(self, seleccion):
         if seleccion in self.ordenes_map:
             self.orden_seleccionada_id = self.ordenes_map[seleccion]
             self._cargar_detalle_orden(self.orden_seleccionada_id)
@@ -124,89 +125,73 @@ class FacturacionScreen(ttk.Frame):
     def _cargar_detalle_orden(self, orden_id):
         self._limpiar_detalle()
         try:
-            detalles = OrdenesDatos.obtener_detalle_de_orden(orden_id)
-            total = 0.0
+            detalle = FacturacionLogica.obtener_detalle_orden(orden_id)
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+            return
 
-            for item in detalles:
-                precio = float(item["precio_aplicado"])
-                total += precio
-                nombre_servicio = item.get("nombre_servicio", f"Servicio #{item['servicio_id']}")
-                self.tree_detalle.insert(
-                    "", "end", values=(nombre_servicio, f"${precio:.2f}")
-                )
+        total = 0.0
+        for item in detalle:
+            precio = float(item["precio_aplicado"])
+            total += precio
+            self.tree_detalle.insert(
+                "", "end", values=(item["nombre_servicio"], f"${precio:,.0f}")
+            )
 
-            self.lbl_total.config(text=f"Total a Pagar: ${total:.2f}")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al cargar el detalle de la orden:\n{e}")
+        self.label_total.configure(text=f"Total a pagar: ${total:,.0f}")
 
     def _limpiar_detalle(self):
         for item in self.tree_detalle.get_children():
             self.tree_detalle.delete(item)
-        self.lbl_total.config(text="Total a Pagar: $0.00")
+        self.label_total.configure(text="Total a pagar: $0")
+
+    # ---------- Eventos ----------
 
     def _generar_comprobante(self):
         if not self.orden_seleccionada_id:
-            messagebox.showwarning(
-                "Atención", "Por favor selecciona una orden antes de facturar."
-            )
+            messagebox.showwarning("Atención", "Seleccione una orden antes de facturar.")
             return
 
         metodo_pago = self.combo_metodo.get().lower()
 
         try:
-            factura_id = FacturacionLogica.generar_factura(
-                self.orden_seleccionada_id, metodo_pago
-            )
-
-            ruta_pdf = self._generar_y_abrir_pdf(factura_id)
-
-            if ruta_pdf:
-                messagebox.showinfo(
-                    "Comprobante Generado",
-                    f"¡Factura #{factura_id} generada exitosamente!\n\n"
-                    f"El PDF se guardó en:\n{ruta_pdf}",
-                )
-            else:
-                messagebox.showinfo(
-                    "Comprobante Generado",
-                    f"¡Factura #{factura_id} generada exitosamente!\n"
-                    f"(No fue posible generar el PDF, pero la factura quedó registrada.)",
-                )
-
-            self.cargar_ordenes_pendientes()
-
+            factura_id = FacturacionLogica.generar_factura(self.orden_seleccionada_id, metodo_pago)
         except ValueError as e:
             messagebox.showerror("Error de Facturación", str(e))
-        except Exception as e:
-            messagebox.showerror("Error inesperado", f"Ocurrió un error:\n{e}")
+            return
+
+        ruta_pdf = self._generar_y_abrir_pdf(factura_id)
+
+        if ruta_pdf:
+            messagebox.showinfo(
+                "Comprobante generado",
+                f"Factura #{factura_id} generada correctamente.\n\nEl PDF se guardó en:\n{ruta_pdf}",
+            )
+        else:
+            messagebox.showinfo(
+                "Comprobante generado",
+                f"Factura #{factura_id} generada correctamente.\n"
+                f"(No fue posible generar el PDF, pero la factura quedó registrada.)",
+            )
+
+        self.cargar_ordenes_pendientes()
 
     def _generar_y_abrir_pdf(self, factura_id):
-        """
-        Genera el PDF de la factura en la carpeta de Documentos del usuario
-        y lo abre automáticamente con el visor de PDF predeterminado.
-        Si algo falla, devuelve None sin interrumpir el flujo de facturación.
-        """
         try:
             factura = FacturacionLogica.obtener_factura(factura_id)
 
             carpeta_destino = os.path.join(os.path.expanduser("~"), "Documents", "AutoWash_Facturas")
             os.makedirs(carpeta_destino, exist_ok=True)
 
-            nombre_archivo = f"factura_{factura_id}.pdf"
-            ruta_pdf = os.path.join(carpeta_destino, nombre_archivo)
-
+            ruta_pdf = os.path.join(carpeta_destino, f"factura_{factura_id}.pdf")
             generar_pdf_factura(factura, ruta_pdf)
-
             self._abrir_pdf(ruta_pdf)
             return ruta_pdf
-
         except Exception as e:
             print(f"No se pudo generar/abrir el PDF de la factura: {e}")
             return None
 
     def _abrir_pdf(self, ruta_pdf):
-        """Abre el PDF con el programa predeterminado del sistema operativo."""
         try:
             if sys.platform.startswith("win"):
                 os.startfile(ruta_pdf)

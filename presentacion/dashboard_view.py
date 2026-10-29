@@ -5,7 +5,8 @@ class DashboardView(ctk.CTkFrame):
     def __init__(self, parent, al_ir_clientes=None, al_ir_vehiculos=None,
                  al_ir_empleados=None, al_ir_servicios=None,
                  al_ir_inventario=None, al_ir_facturacion=None,
-                 al_ir_reportes=None, al_cerrar_sesion=None):  # ← Se agregó al_ir_reportes=None
+                 al_ir_reportes=None, al_ir_catalogo=None,
+                 al_ir_facturas=None, al_cerrar_sesion=None):
         super().__init__(parent)
         self.al_ir_clientes = al_ir_clientes
         self.al_ir_vehiculos = al_ir_vehiculos
@@ -13,7 +14,9 @@ class DashboardView(ctk.CTkFrame):
         self.al_ir_servicios = al_ir_servicios
         self.al_ir_inventario = al_ir_inventario
         self.al_ir_facturacion = al_ir_facturacion
-        self.al_ir_reportes = al_ir_reportes  # ← Guardado de la referencia
+        self.al_ir_reportes = al_ir_reportes
+        self.al_ir_catalogo = al_ir_catalogo
+        self.al_ir_facturas = al_ir_facturas
         self.al_cerrar_sesion = al_cerrar_sesion
 
         self.pack(fill="both", expand=True, padx=20, pady=20)
@@ -31,7 +34,7 @@ class DashboardView(ctk.CTkFrame):
             )
             btn_salir.pack(side="right")
 
-        menu_frame = ctk.CTkFrame(self)
+        menu_frame = ctk.CTkScrollableFrame(self)
         menu_frame.pack(fill="both", expand=True, pady=10)
 
         self._crear_boton(menu_frame, "Gestión de Clientes", self.al_ir_clientes)
@@ -40,7 +43,9 @@ class DashboardView(ctk.CTkFrame):
         self._crear_boton(menu_frame, "Gestión de Servicios", self.al_ir_servicios)
         self._crear_boton(menu_frame, "Gestión de Inventario", self.al_ir_inventario)
         self._crear_boton(menu_frame, "Gestión de Facturación", self.al_ir_facturacion)
-        self._crear_boton(menu_frame, "Reportes y Estadísticas", self.al_ir_reportes)  # ← Se creó el botón de Reportes
+        self._crear_boton(menu_frame, "Reportes y Estadísticas", self.al_ir_reportes)
+        self._crear_boton(menu_frame, "Catálogo de Servicios y Recetas", self.al_ir_catalogo)
+        self._crear_boton(menu_frame, "Facturas Emitidas", self.al_ir_facturas)
 
     def _crear_boton(self, parent, texto, comando):
         if comando is None:

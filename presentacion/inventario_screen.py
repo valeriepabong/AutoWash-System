@@ -32,7 +32,7 @@ class InventarioScreen(ttk.Frame):
             btn_volver.pack(side="right", padx=10)
 
         columnas = ("id", "nombre", "stock_actual", "stock_minimo", "unidad")
-        self.tree = ttk.Treeview(self, columns=columnas, show="headings", height=10)
+        self.tree = ttk.Treeview(self, columns=columnas, show="headings", height=7)
 
         self.tree.heading("id", text="ID")
         self.tree.heading("nombre", text="Insumo")
@@ -47,9 +47,24 @@ class InventarioScreen(ttk.Frame):
         self.tree.column("unidad", width=90, anchor="center")
 
         self.tree.tag_configure("bajo", background="#ffcccc")
-        self.tree.pack(fill="both", expand=True, pady=10)
+        self.tree.pack(fill="both", expand=True, pady=(10, 5))
 
-        # --- NUEVO: formulario para registrar un insumo desde cero ---
+        # --- S5-12: acciones sobre el insumo seleccionado ---
+        frame_acciones = ttk.Frame(self)
+        frame_acciones.pack(fill="x", pady=(0, 5))
+
+        ttk.Button(
+            frame_acciones, text="Editar seleccionado", command=self._editar_insumo
+        ).pack(side="left", padx=(0, 5))
+        ttk.Button(
+            frame_acciones, text="Eliminar seleccionado", command=self._eliminar_insumo
+        ).pack(side="left", padx=5)
+        ttk.Button(
+            frame_acciones, text="Ver historial de movimientos",
+            command=self._ver_historial,
+        ).pack(side="left", padx=5)
+
+        # --- Formulario para registrar un insumo desde cero ---
         form_nuevo = ttk.LabelFrame(self, text="Registrar Insumo Nuevo")
         form_nuevo.pack(fill="x", pady=5, ipady=5)
 
@@ -74,7 +89,7 @@ class InventarioScreen(ttk.Frame):
         )
         btn_crear_insumo.grid(row=0, column=4, rowspan=2, padx=10, pady=5)
 
-        # --- Formulario existente: registrar entrada de stock a un insumo ya creado ---
+        # --- Formulario: registrar entrada de stock a un insumo ya creado ---
         form_frame = ttk.LabelFrame(self, text="Registrar Entrada de Stock")
         form_frame.pack(fill="x", pady=5, ipady=5)
 
@@ -111,7 +126,7 @@ class InventarioScreen(ttk.Frame):
                 tags = ("bajo",) if es_bajo else ()
 
                 self.tree.insert(
-                    "", "end",
+                    "", "end", iid=str(ins["id"]),
                     values=(
                         ins["id"], ins["nombre"], ins["stock_actual"],
                         ins["stock_minimo"], ins["unidad_medida"],
@@ -173,3 +188,150 @@ class InventarioScreen(ttk.Frame):
             )
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error al registrar entrada:\n{e}")
+
+    # ---------- S5-12: editar, eliminar e historial ----------
+
+    def _insumo_seleccionado(self):
+        """Devuelve el dict del insumo elegido en la tabla, o None (y avisa)."""
+        seleccion = self.tree.selection()
+        if not seleccion:
+            messagebox.showwarning(
+                "Advertencia", "Por favor, selecciona un insumo de la tabla primero."
+            )
+            return None
+
+        insumo_id = int(seleccion[0])
+        for insumo in InventarioLogica.listar_insumos():
+            if insumo["id"] == insumo_id:
+                return insumo
+        messagebox.showerror("Error", "El insumo seleccionado ya no existe.")
+        self.cargar_datos()
+        return None
+
+    def _editar_insumo(self):
+        insumo = self._insumo_seleccionado()
+        if insumo is None:
+            return
+
+        ventana = tk.Toplevel(self)
+        ventana.title(f"Editar insumo #{insumo['id']}")
+        ventana.transient(self.winfo_toplevel())
+        ventana.resizable(False, False)
+
+        ttk.Label(ventana, text="Nombre:").grid(row=0, column=0, padx=10, pady=8, sticky="e")
+        txt_nombre = ttk.Entry(ventana, width=28)
+        txt_nombre.insert(0, insumo["nombre"])
+        txt_nombre.grid(row=0, column=1, padx=10, pady=8)
+
+        ttk.Label(ventana, text="Unidad de medida:").grid(row=1, column=0, padx=10, pady=8, sticky="e")
+        txt_unidad = ttk.Entry(ventana, width=28)
+        txt_unidad.insert(0, insumo["unidad_medida"])
+        txt_unidad.grid(row=1, column=1, padx=10, pady=8)
+
+        ttk.Label(ventana, text="Stock mínimo:").grid(row=2, column=0, padx=10, pady=8, sticky="e")
+        txt_minimo = ttk.Entry(ventana, width=28)
+        txt_minimo.insert(0, f"{insumo['stock_minimo']:g}")
+        txt_minimo.grid(row=2, column=1, padx=10, pady=8)
+
+        ttk.Label(
+            ventana,
+            text="El stock actual no se edita aquí: cambia con entradas y consumos.",
+            foreground="gray",
+        ).grid(row=3, column=0, columnspan=2, padx=10, pady=(0, 8))
+
+        def guardar():
+            try:
+                InventarioLogica.editar_insumo(
+                    insumo["id"], txt_nombre.get(), txt_unidad.get(), txt_minimo.get()
+                )
+            except ValueError as e:
+                messagebox.showerror("Error de validación", str(e), parent=ventana)
+                return
+            ventana.destroy()
+            messagebox.showinfo("Éxito", "Insumo actualizado correctamente.")
+            self.cargar_datos()
+
+        botones = ttk.Frame(ventana)
+        botones.grid(row=4, column=0, columnspan=2, pady=(0, 10))
+        ttk.Button(botones, text="Guardar", command=guardar).pack(side="left", padx=5)
+        ttk.Button(botones, text="Cancelar", command=ventana.destroy).pack(side="left", padx=5)
+
+        ventana.grab_set()
+        txt_nombre.focus_set()
+
+    def _eliminar_insumo(self):
+        insumo = self._insumo_seleccionado()
+        if insumo is None:
+            return
+
+        confirmar = messagebox.askyesno(
+            "Confirmar",
+            f"¿Desea eliminar el insumo '{insumo['nombre']}'?\n\n"
+            "Dejará de aparecer en el inventario, pero su historial se conserva.",
+        )
+        if not confirmar:
+            return
+
+        try:
+            InventarioLogica.eliminar_insumo(insumo["id"])
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+            return
+
+        messagebox.showinfo("Éxito", "Insumo eliminado correctamente.")
+        self.cargar_datos()
+
+    def _ver_historial(self):
+        """Muestra los movimientos del insumo seleccionado (o de todos si no hay selección)."""
+        seleccion = self.tree.selection()
+        insumo_id = int(seleccion[0]) if seleccion else None
+
+        try:
+            movimientos = InventarioLogica.listar_movimientos(insumo_id)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el historial:\n{e}")
+            return
+
+        ventana = tk.Toplevel(self)
+        titulo = "Historial de movimientos"
+        if insumo_id is not None and movimientos:
+            titulo += f" - {movimientos[0]['nombre_insumo']}"
+        elif insumo_id is None:
+            titulo += " - todos los insumos"
+        ventana.title(titulo)
+        ventana.transient(self.winfo_toplevel())
+        ventana.geometry("780x380")
+
+        columnas = ("fecha", "insumo", "tipo", "cantidad", "orden", "motivo")
+        tabla = ttk.Treeview(ventana, columns=columnas, show="headings")
+        encabezados = {
+            "fecha": ("Fecha y hora", 140), "insumo": ("Insumo", 150),
+            "tipo": ("Tipo", 70), "cantidad": ("Cantidad", 90),
+            "orden": ("Orden", 60), "motivo": ("Motivo", 240),
+        }
+        for clave, (texto, ancho) in encabezados.items():
+            tabla.heading(clave, text=texto)
+            tabla.column(clave, width=ancho, anchor="w" if clave in ("insumo", "motivo") else "center")
+
+        tabla.tag_configure("entrada", foreground="#1b7f3b")
+        tabla.tag_configure("salida", foreground="#b02a2a")
+
+        for m in movimientos:
+            tabla.insert(
+                "", "end",
+                values=(
+                    m["fecha_hora"], m["nombre_insumo"], m["tipo_movimiento"].capitalize(),
+                    f"{m['cantidad']:g} {m['unidad_medida']}",
+                    m["orden_id"] if m["orden_id"] else "-",
+                    m["motivo"] or "",
+                ),
+                tags=(m["tipo_movimiento"],),
+            )
+
+        if not movimientos:
+            tabla.insert("", "end", values=("", "Sin movimientos registrados", "", "", "", ""))
+
+        barra = ttk.Scrollbar(ventana, orient="vertical", command=tabla.yview)
+        tabla.configure(yscrollcommand=barra.set)
+        tabla.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)
+        barra.pack(side="right", fill="y", pady=10, padx=(0, 10))

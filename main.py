@@ -9,6 +9,8 @@ from presentacion.servicios_screen import ServiciosScreen
 from presentacion.inventario_screen import InventarioScreen
 from presentacion.facturacion_screen import FacturacionScreen
 from presentacion.reportes_screen import ReportesScreen
+from presentacion.catalogo_servicios_screen import CatalogoServiciosScreen
+from presentacion.facturas_screen import FacturasScreen
 
 class AplicacionPrincipal(ctk.CTk):
     def __init__(self):
@@ -43,6 +45,8 @@ class AplicacionPrincipal(ctk.CTk):
             al_ir_inventario=self.mostrar_inventario,
             al_ir_facturacion=self.mostrar_facturacion,
             al_ir_reportes=self.mostrar_reportes,
+            al_ir_catalogo=self.mostrar_catalogo,
+            al_ir_facturas=self.mostrar_facturas,
             al_cerrar_sesion=self.mostrar_login
         )
         self.vista_actual.pack(fill="both", expand=True)
@@ -74,6 +78,14 @@ class AplicacionPrincipal(ctk.CTk):
     def mostrar_reportes(self):
         self._limpiar_pantalla()
         self.vista_actual = ReportesScreen(self, al_volver=self.mostrar_dashboard)
+
+    def mostrar_catalogo(self):
+        self._limpiar_pantalla()
+        self.vista_actual = CatalogoServiciosScreen(self, al_volver=self.mostrar_dashboard)
+
+    def mostrar_facturas(self):
+        self._limpiar_pantalla()
+        self.vista_actual = FacturasScreen(self, al_volver=self.mostrar_dashboard)
 
 if __name__ == "__main__":
     app = AplicacionPrincipal()
