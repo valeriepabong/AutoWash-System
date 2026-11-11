@@ -1,166 +1,122 @@
-# AutoWash System: Resumen del proyecto y avances
+# AutoWash System: Resumen del proyecto y backlog
 
-Documento de seguimiento del Sistema de Gestión de Lavadero de Vehículos. Resume el contexto, las decisiones técnicas, lo que ya se construyó en cada sprint y lo que sigue pendiente.
+Documento de seguimiento del Sistema de Gestión de Lavadero de Vehículos. Resume el contexto, las decisiones técnicas, lo construido en cada sprint y el estado del backlog.
 
 ---
 
 ## 1. Contexto del proyecto
 
-Proyecto universitario en equipo de 6 personas. El sistema es de uso interno para un solo local (empleados y administrador), sin portal para clientes finales. El alcance de gestión es completo: servicios, clientes, empleados, inventario, facturación y reportes.
+Proyecto universitario enfocado en un sistema de escritorio para la administración integral de un lavadero de vehículos (empleados y administrador). El alcance comprende:
+- Autenticación y control de usuarios.
+- Gestión de clientes y vehículos vinculados.
+- Catálogo dinámico de servicios y asignación de operarios.
+- Ciclo de vida de órdenes de servicio en 4 estados (`espera`, `proceso`, `listo`, `entregado`).
+- Control de inventario de insumos con recetas y descuento atómico de existencias.
+- Facturación con múltiples medios de pago y consulta de facturas emitidas.
+- Dashboard de reportes (ingresos, servicios más solicitados, consumo de insumos y rendimiento de empleados).
 
-Metodología: Scrum.
+**Metodología:** Scrum.
+
+---
 
 ## 2. Stack técnico
 
-- Lenguaje: Python 3.12 o superior
-- Interfaz gráfica: CustomTkinter (aplicación de escritorio)
-- Base de datos: SQLite con el módulo `sqlite3`, sin ORM
-- Empaquetado final: PyInstaller (genera un .exe)
-- Control de versiones: Git y GitHub
-- Editor: Visual Studio Code y PyCharm según el integrante
+- **Lenguaje:** Python 3.10 o superior (compatible con Python 3.12+).
+- **Interfaz gráfica:** CustomTkinter / Tkinter (Treeviews nativos estilizados).
+- **Base de datos:** SQLite 3 nativo (`sqlite3`), sin dependencias pesadas de ORM.
+- **Integridad referencial:** Habilitada mediante `PRAGMA foreign_keys = ON`.
+- **Pruebas unitarias:** Módulo nativo `unittest` en suite automatizada (`tests/`).
+- **Empaquetado final:** PyInstaller (compatible mediante resolución dinámica de ruta en `obtener_ruta_db()`).
+- **Control de versiones:** Git y GitHub.
+
+---
 
 ## 3. Arquitectura por capas
 
 ```
 AutoWash-System/
-├── main.py            punto de entrada único
-├── requirements.txt
-├── presentacion/      pantallas (CustomTkinter)
-├── logica/            reglas de negocio y validaciones
-├── datos/             acceso a datos (SQL puro)
-└── db/
-    └── conexion.py    conexión y creación de tablas
+├── main.py                     # Punto de entrada único del sistema
+├── requirements.txt            # Dependencias del proyecto
+├── CONTRIBUTING.md             # Guía para colaboradores
+├── README.md                   # Documentación general y puesta en marcha
+├── Dso/                        # Documentación técnica de desarrollo
+│   ├── ARQUITECTURA.md         # Patrón de capas y flujo transaccional detallado
+│   ├── der.md                  # DER con las 11 tablas y diccionario de datos
+│   ├── backlog.md              # Estado de tareas y sprints
+│   └── Documentacion_Sprint_3_y_4.md
+├── db/                         # Persistencia
+│   ├── autowash.db             # Base de datos SQLite local
+│   └── conexion.py             # Conexión centralizada, migración y creación de tablas
+├── presentacion/               # Capa 1: Vistas CustomTkinter (UI pura, sin SQL)
+├── logica/                     # Capa 2: Reglas de negocio, validaciones y orquestación
+├── datos/                      # Capa 3: DAOs con consultas SQL parametrizadas
+├── scripts/                    # Utilidades y siembra de datos de prueba
+│   └── sembrar_datos_demo.py
+└── tests/                      # Suite de pruebas automatizadas
 ```
 
-Regla de oro: cada capa solo conoce a la de abajo. La presentación llama a la lógica, la lógica llama a datos, y datos llama a la conexión. La interfaz nunca ve SQL.
+**Regla de oro:** Cada capa solo conoce a la de abajo:
+$$\text{Presentación} \longrightarrow \text{Lógica} \longrightarrow \text{Datos} \longrightarrow \text{Base de Datos}$$
 
-Convención acordada para todo el backend: clases con métodos estáticos (por ejemplo `ClientesLogica.registrar_cliente(...)`), nombres de archivo en la forma `algo_logica.py` y `algo_datos.py`. Los registros se devuelven como diccionarios, no como tuplas.
+---
 
-## 4. Lo que pasó al inicio del Sprint 1 (lecciones aprendidas)
+## 4. Histórico de Sprints
 
-Durante el arranque hubo un problema de coordinación: existían archivos duplicados que hacían lo mismo con nombres distintos (por ejemplo dos versiones de login, dos archivos de conexión y dos versiones del módulo de vehículos). Además, alguien había reintroducido contraseñas en texto plano y una tabla vieja llamada `lavados`.
+### Sprint 1: Autenticación, Clientes y Vehículos
+- **Login y Usuarios:** Autenticación con SHA-256 + salt único. Creación automática del usuario `admin` (`admin123`).
+- **Clientes:** Registro, actualización, listado y búsqueda insensible a mayúsculas/tildes con borrado lógico (`activo = 0`).
+- **Vehículos:** Validación obligatoria y única de placas en mayúsculas, tipo de vehículo y asociación foránea al cliente.
 
-Se resolvió así:
+### Sprint 2: Catálogo de Servicios y Empleados
+- **Catálogo de Servicios:** Precios fijos preconfigurados (Lavado básico, Lavado completo, Encerado, Aspirado de interiores).
+- **Empleados:** Gestión de operarios de lavado con borrado lógico.
+- **Órdenes preliminares:** Creación de cabecera y detalle de orden con total calculado.
 
-- Se eliminaron los archivos duplicados y el código muerto.
-- Se dejó `db/conexion.py` como único archivo oficial de conexión.
-- Se estandarizó todo el backend al estilo de clases con métodos estáticos.
-- Se eliminó la tabla `lavados` y el módulo que dependía de ella.
-- Se corrigió el `.gitignore`, que apuntaba a `.venv/` cuando la carpeta real se llama `venv/`, y que además no excluía los archivos `.db`.
+### Sprints 3 y 4: Estados de Órdenes, Insumos e Inventario
+- **Ciclo de Estados:** Estandarización de 4 estados: `espera` $\to$ `proceso` $\to$ `listo` $\to$ `entregado`.
+- **Insumos y Recetas:** Creación de tablas `insumos`, `movimientos_inventario` y la tabla intermedia `servicio_insumo` para descontar insumos automáticamente por cada servicio realizado.
+- **Alertas de Stock:** Validación de niveles mínimos de insumos.
 
-Lecciones para el equipo:
+### Sprint 5: Facturación, Descuento Atómico, Reportes y Estabilización
+- **S5-01 / S5-04:** Estandarización de nombres (`reportes_datos.py`, `reportes_logica.py`) e implementación de `obtener_ruta_db()` con variable `AUTOWASH_DB` para pruebas independientes y PyInstaller.
+- **S5-03:** Creación del script `scripts/sembrar_datos_demo.py` para generación determinista de escenarios de prueba (clientes, vehículos, órdenes y facturas).
+- **S5-07:** Implementación de `listar_ordenes_por_facturar()` y `obtener_detalle_orden()` en `FacturacionLogica`.
+- **S5-08:** Orquestación atómica en una única transacción: creación de orden, renglones de detalle, descuento en existencias de insumos y auditoría en Kardex con soporte de `rollback()`.
+- **S5-15:** Actualización de documentación técnica (`Dso/der.md` con 11 tablas, `Dso/ARQUITECTURA.md` con ejemplo real transaccional, `CONTRIBUTING.md` y `README.md`).
 
-- Antes de modificar archivos de `logica/` o `datos/`, avisar a quien es responsable de esa capa.
-- Nunca subir `venv/`, archivos `.db`, `.idea/` ni `.vscode/` a GitHub.
-- Si el esquema de una tabla cambia, hay que borrar el archivo `autowash.db` local para que se regenere, porque `CREATE TABLE IF NOT EXISTS` no modifica tablas que ya existen.
-- Nunca ejecutar directamente archivos de `logica/` o `datos/`. Siempre se corre `main.py` desde la raíz del proyecto (en PyCharm, marcando la raíz como Sources Root).
+---
 
-## 5. Sprint 1: completado
+## 5. Modelo de Datos (11 Tablas Oficiales)
 
-Objetivo: login, clientes, vehículos y la base para asignar servicios.
+1. `usuarios` (id, nombre_usuario, contrasena_hash, salt, activo)
+2. `clientes` (id, nombre, telefono, activo)
+3. `vehiculos` (id, placa, marca, modelo, tipo_vehiculo, cliente_id, activo)
+4. `empleados` (id, nombre, activo)
+5. `servicios` (id, nombre, precio, activo)
+6. `ordenes_servicio` (id, vehiculo_id, empleado_id, fecha_hora, total, estado)
+7. `orden_servicio_detalle` (id, orden_id, servicio_id, precio_aplicado)
+8. `insumos` (id, nombre, unidad_medida, stock_actual, stock_minimo, activo)
+9. `movimientos_inventario` (id, insumo_id, tipo_movimiento, cantidad, fecha_hora, orden_id, motivo)
+10. `servicio_insumo` (servicio_id, insumo_id, cantidad_consumida)
+11. `facturas` (id, orden_id, metodo_pago, total, fecha_hora)
 
-**HU17, Login básico.** Terminada y probada.
-- Validación de usuario y contraseña, con bloqueo de acceso sin login.
-- Las contraseñas se guardan con hash SHA-256 más un salt aleatorio por usuario, nunca en texto plano.
-- Al iniciar la aplicación por primera vez se crea automáticamente el usuario `admin` con contraseña `admin123`, solo si la tabla de usuarios está vacía.
-- Acceso único para todos, sin roles diferenciados.
+---
 
-**HU05, Registrar y consultar clientes.** Terminada y probada.
-- El nombre es obligatorio y el teléfono es opcional.
-- Se permiten nombres repetidos, porque dos clientes distintos pueden llamarse igual. El cliente se identifica por su id.
-- Listado ordenado alfabéticamente y búsqueda parcial que ignora mayúsculas y tildes (buscar "gom" encuentra "Gómez").
-- El borrado es lógico: el cliente se marca como inactivo para no perder su historial.
+## 6. Ejecución del Sistema y Pruebas
 
-**HU01, Registrar ingreso de vehículo.** Terminada y probada.
-- La placa es obligatoria y única, y se guarda en mayúsculas.
-- El tipo de vehículo es obligatorio. Marca y modelo son opcionales.
-- Cada vehículo pertenece obligatoriamente a un cliente, y se valida que ese cliente exista.
-- En pantalla, el cliente se elige desde un desplegable de clientes ya registrados, para evitar duplicados por errores de tipeo.
-
-**Frontend del Sprint 1.** Pantallas de login, dashboard, clientes y vehículos, conectadas desde `main.py` con navegación por callbacks (login, luego dashboard, luego clientes o vehículos).
-
-## 6. Base de datos actual
-
-Tablas del Sprint 1:
-
-- `usuarios`: id, nombre_usuario (único), contrasena_hash, salt, activo.
-- `clientes`: id, nombre, telefono, activo.
-- `vehiculos`: id, placa (única), marca, modelo, tipo_vehiculo, cliente_id (llave foránea a clientes), activo.
-
-Tablas del Sprint 2:
-
-- `empleados`: id, nombre, activo.
-- `servicios`: id, nombre (único), precio, activo. Es el catálogo de servicios con precio fijo.
-- `ordenes_servicio`: id, vehiculo_id, empleado_id (opcional hasta finalizar), fecha_hora, total, estado (pendiente o finalizado).
-- `orden_servicio_detalle`: id, orden_id, servicio_id, precio_aplicado. Es la tabla intermedia que permite varios servicios en una misma orden.
-
-Relaciones principales:
-
-- Un cliente puede tener muchos vehículos.
-- Un vehículo puede tener muchas órdenes de servicio.
-- Una orden puede incluir muchos servicios, a través de la tabla de detalle.
-- Un empleado puede finalizar muchas órdenes.
-- `usuarios` no se relaciona con las demás tablas a propósito, porque el login es independiente del negocio.
-
-Decisiones de diseño importantes:
-
-- Se guarda `precio_aplicado` en el detalle como copia del precio del momento. Así, si el precio del catálogo sube después, las órdenes históricas no cambian.
-- Todas las tablas usan borrado lógico con la columna `activo`.
-- Las llaves foráneas están activadas con `PRAGMA foreign_keys = ON`.
-- La orden y su detalle se crean en una sola transacción. Si algo falla, se deshace todo y no queda una orden a medias.
-
-## 7. Sprint 2: avance actual
-
-Objetivo: asignar servicios a un vehículo y manejar empleados.
-
-Reglas de negocio acordadas:
-
-- Un vehículo puede recibir varios servicios en una misma visita.
-- Los precios son fijos y vienen del catálogo; el empleado no los edita al asignar.
-- La fecha y hora se registran automáticamente al crear la orden.
-- El total se calcula automáticamente sumando los precios del catálogo, nunca se toma de la pantalla.
-- Se debe seleccionar al menos un servicio.
-- El flujo es en dos pasos: primero se crea la orden con vehículo y servicios (estado pendiente, sin empleado), y al terminar se finaliza indicando el empleado responsable.
-
-Backend construido y probado en un entorno de pruebas:
-
-- `datos/servicios_datos.py`: operaciones sobre el catálogo de servicios.
-- `datos/empleados_datos.py`: registro, consulta y desactivación de empleados, y conteo de servicios realizados.
-- `datos/ordenes_datos.py`: creación transaccional de la orden con su detalle, consultas con nombre de vehículo y empleado, y finalización.
-- `logica/servicios_logica.py`: catálogo con servicios por defecto (Lavado básico, Lavado completo, Encerado, Aspirado de interiores), asignación de servicios con todas las validaciones, y finalización de órdenes.
-- `logica/empleados_logica.py`: registro y consulta de empleados y de sus servicios realizados.
-
-Validaciones ya cubiertas y probadas:
-
-- No se puede asignar servicio sin seleccionar al menos uno.
-- No se puede asignar servicio a un vehículo inexistente.
-- El total se calcula correctamente (por ejemplo, Lavado básico más Encerado da 35.000).
-- No se puede finalizar una orden que ya está finalizada.
-- No se puede finalizar sin un empleado válido y activo.
-
-## 8. Reparto de trabajo
-
-- **Backend (esta parte):** tablas, repositorios de datos y lógica de negocio de login, clientes, vehículos, servicios, empleados y órdenes.
-- **Otro desarrollador:** el flujo de cambio de estado del servicio (espera, proceso, terminado, entregado) con validación de que no se salten estados. Es un concepto distinto del estado actual pendiente o finalizado, que solo indica si la orden ya tiene empleado asignado.
-- **Frontend:** pantallas de asignar servicio, finalizar servicio y empleados.
-
-Punto de coordinación importante: el flujo de cuatro estados probablemente agregará una columna a `ordenes_servicio`. Conviene avisar antes de tocar `db/conexion.py` o `datos/ordenes_datos.py`, y acordar entre todos si la columna va en la misma tabla o en una aparte, para no repetir el problema de esquemas paralelos.
-
-## 9. Pendiente y próximos pasos
-
-- Confirmar que los archivos del Sprint 2 ya estén integrados en el repositorio real y que la aplicación arranque sin errores con la base de datos regenerada.
-- Pantalla de asignar servicio (lista de servicios con selección múltiple y total visible).
-- Pantalla de finalizar servicio (órdenes pendientes y selector de empleado).
-- Pantalla de empleados.
-- Agregar el botón de volver al dashboard en la pantalla de vehículos, para que la navegación sea consistente con la de clientes.
-- Flujo de cuatro estados del servicio (responsable: otro desarrollador).
-- Módulos que aún no se han empezado: inventario con descuento automático y alertas de stock bajo, facturación con método de pago, y reportes de ingresos, servicios más solicitados y consumo de insumos.
-- Documentar y presentar el diagrama entidad-relación actualizado con las tablas del Sprint 2.
-
-## 10. Cómo ejecutar el proyecto
-
-1. Abrir la carpeta raíz `AutoWash-System` en el editor.
-2. Activar el entorno virtual e instalar dependencias con `pip install -r requirements.txt`.
-3. Si hubo cambios de esquema, borrar el archivo `db/autowash.db` local para que se regenere.
-4. Ejecutar siempre `main.py` desde la raíz del proyecto.
-5. Ingresar con el usuario `admin` y la contraseña `admin123`.
+1. **Instalación de dependencias:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. **Ejecutar la aplicación:**
+   ```bash
+   python main.py
+   ```
+3. **Poblar datos de prueba:**
+   ```bash
+   python scripts/sembrar_datos_demo.py
+   ```
+4. **Ejecutar la suite de pruebas unitarias:**
+   ```bash
+   python -m unittest discover -s tests
+   ```
