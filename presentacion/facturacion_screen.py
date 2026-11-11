@@ -1,98 +1,300 @@
 import os
 import subprocess
 import sys
-
-import customtkinter as ctk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 
 from logica.facturacion_logica import FacturacionLogica
 from logica.pdf_factura import generar_pdf_factura
+from presentacion.sidebar_component import SidebarComponent, configurar_estilo_tabla
 
 
 class FacturacionScreen(ctk.CTkFrame):
     """
-    Pantalla de Facturación (S5-07).
-
-    Usa exactamente los dos métodos que definió backend para esta tarea:
-        FacturacionLogica.listar_ordenes_por_facturar()
-            -> [{id, vehiculo_id, placa, nombre_cliente, fecha_hora, total, estado}]
-        FacturacionLogica.obtener_detalle_orden(orden_id)
-            -> [{id, servicio_id, precio_aplicado, nombre_servicio}]
-    y para generar el comprobante:
-        FacturacionLogica.generar_factura(orden_id, metodo_pago) -> id de la factura
-        FacturacionLogica.obtener_factura(factura_id) -> dict con todo lo que pide el PDF
+    Pantalla de Gestión de Facturación fiel al diseño Figma (Imagen 3 derecha):
+    - Barra lateral #0B4F66 (SidebarComponent) con sección activa 'Facturacion'.
+    - Área principal #E7F9FF con enlace '← volver al panel principal'.
+    - Tarjeta blanca superior 'Seleccion de orden entregada' con combo y botón 'Recargar' (#F68B2E).
+    - Sección media 'Detalle de servicios' con tabla Autowash.Treeview (cabecera #BCE3F0).
+    - Tarjeta blanca inferior con 'Metodo de pago', 'Total a pagar : $ 0' y botón 'Generar comprobante'.
     """
 
-    def __init__(self, parent, al_volver=None):
-        super().__init__(parent)
-        self.al_volver = al_volver
-        self.pack(fill="both", expand=True, padx=20, pady=20)
+    def __init__(self, parent, al_volver=None, al_ir_dashboard=None,
+                 al_ir_clientes=None, al_ir_vehiculos=None,
+                 al_ir_servicios=None, al_ir_empleados=None,
+                 al_ir_inventario=None, al_ir_facturacion=None,
+                 al_ir_reportes=None, al_ir_catalogo=None,
+                 al_ir_facturas=None, al_cerrar_sesion=None, **kwargs):
+        super().__init__(parent, fg_color="#E7F9FF", corner_radius=0)
+        self.al_volver = al_volver or al_ir_dashboard
+        self.al_ir_dashboard = al_ir_dashboard or al_volver
+        self.al_ir_clientes = al_ir_clientes
+        self.al_ir_vehiculos = al_ir_vehiculos
+        self.al_ir_servicios = al_ir_servicios
+        self.al_ir_empleados = al_ir_empleados
+        self.al_ir_inventario = al_ir_inventario
+        self.al_ir_facturacion = al_ir_facturacion
+        self.al_ir_reportes = al_ir_reportes
+        self.al_ir_catalogo = al_ir_catalogo
+        self.al_ir_facturas = al_ir_facturas
+        self.al_cerrar_sesion = al_cerrar_sesion
 
         self.ordenes_map = {}
         self.orden_seleccionada_id = None
 
+        self.pack(fill="both", expand=True)
+
+        configurar_estilo_tabla()
         self._crear_interfaz()
         self.cargar_ordenes_pendientes()
 
     def _crear_interfaz(self):
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(0, 10))
+        # ------------------------------------------------------------------ #
+        # 1. BARRA LATERAL (SIDEBAR)                                         #
+        # ------------------------------------------------------------------ #
+        self.sidebar = SidebarComponent(
+            self,
+            seccion_activa="Facturacion",
+            al_volver=self.al_volver,
+            al_ir_dashboard=self.al_ir_dashboard,
+            al_ir_clientes=self.al_ir_clientes,
+            al_ir_vehiculos=self.al_ir_vehiculos,
+            al_ir_servicios=self.al_ir_servicios,
+            al_ir_empleados=self.al_ir_empleados,
+            al_ir_inventario=self.al_ir_inventario,
+            al_ir_facturacion=self.al_ir_facturacion,
+            al_ir_reportes=self.al_ir_reportes,
+            al_ir_catalogo=self.al_ir_catalogo,
+            al_ir_facturas=self.al_ir_facturas,
+            al_cerrar_sesion=self.al_cerrar_sesion,
+        )
 
-        ctk.CTkLabel(
-            header_frame, text="Módulo de Facturación", font=ctk.CTkFont(size=22, weight="bold")
-        ).pack(side="left")
+        # ------------------------------------------------------------------ #
+        # 2. CONTENEDOR PRINCIPAL DERECHO                                    #
+        # ------------------------------------------------------------------ #
+        self.main_container = ctk.CTkFrame(self, fg_color="#E7F9FF", corner_radius=0)
+        self.main_container.pack(side="right", fill="both", expand=True)
 
-        if self.al_volver:
+        self.scroll_body = ctk.CTkScrollableFrame(self.main_container, fg_color="#E7F9FF")
+        self.scroll_body.pack(fill="both", expand=True, padx=28, pady=20)
+
+        # ————— ENCABEZADO Y NAVEGACIÓN —————
+        header_nav = ctk.CTkFrame(self.scroll_body, fg_color="transparent")
+        header_nav.pack(fill="x", pady=(0, 6))
+
+        btn_volver_dash = ctk.CTkButton(
+            header_nav,
+            text="← volver al panel principal",
+            command=self.al_volver,
+            fg_color="transparent",
+            hover_color="#D5EFF7",
+            text_color="#0B4F66",
+            font=("Segoe UI", 12, "bold"),
+            anchor="w",
+            height=28
+        )
+        btn_volver_dash.pack(side="left")
+
+        if self.al_ir_facturas:
             ctk.CTkButton(
-                header_frame, text="Volver al Dashboard", command=self.al_volver, width=150
+                header_nav,
+                text="📑 Historial de facturas",
+                command=self.al_ir_facturas,
+                fg_color="#0B4F66",
+                hover_color="#336E84",
+                text_color="#FFFFFF",
+                font=("Segoe UI", 11, "bold"),
+                height=32,
+                corner_radius=12
             ).pack(side="right")
 
-        frame_orden = ctk.CTkFrame(self)
-        frame_orden.pack(fill="x", pady=5, padx=5, ipady=5)
-
-        ctk.CTkLabel(frame_orden, text="Órdenes listas para facturar:").grid(
-            row=0, column=0, padx=10, pady=10
-        )
-
-        self.combo_ordenes = ctk.CTkComboBox(
-            frame_orden, state="readonly", width=350, command=self._al_seleccionar_orden
-        )
-        self.combo_ordenes.grid(row=0, column=1, padx=10, pady=10)
-
-        ctk.CTkButton(
-            frame_orden, text="Recargar", width=90, command=self.cargar_ordenes_pendientes
-        ).grid(row=0, column=2, padx=10, pady=10)
+        ctk.CTkLabel(
+            self.scroll_body,
+            text="Gestión de facturación",
+            font=("Georgia", 30),
+            text_color="#000000",
+            anchor="w"
+        ).pack(fill="x", pady=(4, 2))
 
         ctk.CTkLabel(
-            self, text="Detalle de servicios:", font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(anchor="w", pady=(15, 5), padx=5)
+            self.scroll_body,
+            text="Comprobantes para órdenes entregadas",
+            font=("Segoe UI", 13),
+            text_color="#666666",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 18))
 
-        columnas = ("servicio", "precio")
-        self.tree_detalle = ttk.Treeview(self, columns=columnas, show="headings", height=6)
-        self.tree_detalle.heading("servicio", text="Servicio")
-        self.tree_detalle.heading("precio", text="Precio aplicado")
-        self.tree_detalle.column("servicio", width=300, anchor="w")
-        self.tree_detalle.column("precio", width=120, anchor="e")
-        self.tree_detalle.pack(fill="both", expand=True, pady=5, padx=5)
-
-        frame_pago = ctk.CTkFrame(self, fg_color="transparent")
-        frame_pago.pack(fill="x", pady=10, padx=5)
-
-        self.label_total = ctk.CTkLabel(
-            frame_pago, text="Total a pagar: $0", font=ctk.CTkFont(size=16, weight="bold")
+        # ————— TARJETA BLANCA SUPERIOR: Seleccion de orden entregada —————
+        card_orden = ctk.CTkFrame(
+            self.scroll_body,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
         )
-        self.label_total.pack(side="left", padx=5)
+        card_orden.pack(fill="x", pady=(0, 18))
 
-        ctk.CTkLabel(frame_pago, text="Método de pago:").pack(side="left", padx=(30, 5))
-        self.combo_metodo = ctk.CTkComboBox(
-            frame_pago, state="readonly", values=["Efectivo", "Tarjeta", "Transferencia"], width=140
+        inner_orden = ctk.CTkFrame(card_orden, fg_color="transparent")
+        inner_orden.pack(fill="both", expand=True, padx=24, pady=18)
+
+        ctk.CTkLabel(
+            inner_orden,
+            text="Seleccion de orden entregada",
+            font=("Georgia", 20),
+            text_color="#3C3B3B",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            inner_orden,
+            text="Orden lista para facturar",
+            font=("Segoe UI", 12, "bold"),
+            text_color="#111111",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 4))
+
+        fila_orden = ctk.CTkFrame(inner_orden, fg_color="transparent")
+        fila_orden.pack(fill="x")
+
+        self.combo_ordenes = ctk.CTkComboBox(
+            fila_orden,
+            state="readonly",
+            height=40,
+            corner_radius=14,
+            fg_color="#FFFFFF",
+            border_width=1,
+            border_color="#000000",
+            button_color="#FFFFFF",
+            button_hover_color="#E7F9FF",
+            text_color="#111111",
+            dropdown_fg_color="#FFFFFF",
+            dropdown_text_color="#111111",
+            dropdown_hover_color="#D9F0F9",
+            command=self._al_seleccionar_orden,
+            font=("Segoe UI", 12)
         )
-        self.combo_metodo.set("Efectivo")
-        self.combo_metodo.pack(side="left", padx=5)
+        self.combo_ordenes.pack(side="left", fill="x", expand=True, padx=(0, 14))
 
         ctk.CTkButton(
-            frame_pago, text="Generar Comprobante", command=self._generar_comprobante, fg_color="green"
-        ).pack(side="right", padx=5)
+            fila_orden,
+            text="Recargar",
+            width=150,
+            height=40,
+            corner_radius=14,
+            fg_color="#F68B2E",
+            hover_color="#E0781E",
+            text_color="#000000",
+            font=("Segoe UI", 12, "bold"),
+            command=self.cargar_ordenes_pendientes
+        ).pack(side="right")
+
+        # ————— SECCIÓN MEDIA: Detalle de servicios —————
+        ctk.CTkLabel(
+            self.scroll_body,
+            text="Detalle de servicios",
+            font=("Georgia", 15),
+            text_color="#111111",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 6))
+
+        card_detalle = ctk.CTkFrame(
+            self.scroll_body,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_detalle.pack(fill="both", expand=True, pady=(0, 18))
+
+        inner_detalle = ctk.CTkFrame(card_detalle, fg_color="transparent")
+        inner_detalle.pack(fill="both", expand=True, padx=16, pady=16)
+
+        columnas = ("servicio", "precio")
+        self.tree_detalle = ttk.Treeview(
+            inner_detalle,
+            columns=columnas,
+            show="headings",
+            height=6,
+            style="Autowash.Treeview"
+        )
+        self.tree_detalle.heading("servicio", text="Servicio")
+        self.tree_detalle.heading("precio", text="Precio aplicado ( $ )")
+        self.tree_detalle.column("servicio", width=360, anchor="center")
+        self.tree_detalle.column("precio", width=180, anchor="center")
+        self.tree_detalle.pack(fill="both", expand=True)
+
+        # ————— TARJETA BLANCA INFERIOR DE PAGO —————
+        card_pago = ctk.CTkFrame(
+            self.scroll_body,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_pago.pack(fill="x")
+
+        inner_pago = ctk.CTkFrame(card_pago, fg_color="transparent")
+        inner_pago.pack(fill="x", padx=24, pady=18)
+        inner_pago.grid_columnconfigure(0, weight=1)
+        inner_pago.grid_columnconfigure(1, weight=1)
+        inner_pago.grid_columnconfigure(2, weight=1)
+
+        # Izquierda: Label "Metodo de pago" + self.combo_metodo
+        col_metodo = ctk.CTkFrame(inner_pago, fg_color="transparent")
+        col_metodo.grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(
+            col_metodo,
+            text="Metodo de pago",
+            font=("Segoe UI", 12, "bold"),
+            text_color="#111111",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 4))
+
+        self.combo_metodo = ctk.CTkComboBox(
+            col_metodo,
+            state="readonly",
+            values=["Efectivo", "Tarjeta", "Transferencia"],
+            width=190,
+            height=40,
+            corner_radius=14,
+            fg_color="#FFFFFF",
+            border_width=1,
+            border_color="#000000",
+            button_color="#FFFFFF",
+            button_hover_color="#E7F9FF",
+            text_color="#111111",
+            dropdown_fg_color="#FFFFFF",
+            dropdown_text_color="#111111",
+            dropdown_hover_color="#D9F0F9",
+            font=("Segoe UI", 12)
+        )
+        self.combo_metodo.set("Efectivo")
+        self.combo_metodo.pack(anchor="w")
+
+        # Centro: Total a pagar
+        self.label_total = ctk.CTkLabel(
+            inner_pago,
+            text="Total a pagar : $ 0",
+            font=("Georgia", 16, "bold"),
+            text_color="#111111"
+        )
+        self.label_total.grid(row=0, column=1, sticky="s", pady=6)
+
+        # Derecha: Botón Generar comprobante
+        btn_generar = ctk.CTkButton(
+            inner_pago,
+            text="Generar comprobante",
+            command=self._generar_comprobante,
+            fg_color="#F68B2E",
+            hover_color="#E0781E",
+            text_color="#000000",
+            font=("Segoe UI", 12, "bold"),
+            height=42,
+            corner_radius=14,
+            width=190
+        )
+        btn_generar.grid(row=0, column=2, sticky="se")
 
     # ---------- Carga de datos ----------
 
@@ -138,12 +340,12 @@ class FacturacionScreen(ctk.CTkFrame):
                 "", "end", values=(item["nombre_servicio"], f"${precio:,.0f}")
             )
 
-        self.label_total.configure(text=f"Total a pagar: ${total:,.0f}")
+        self.label_total.configure(text=f"Total a pagar : $ {total:,.0f}")
 
     def _limpiar_detalle(self):
         for item in self.tree_detalle.get_children():
             self.tree_detalle.delete(item)
-        self.label_total.configure(text="Total a pagar: $0")
+        self.label_total.configure(text="Total a pagar : $ 0")
 
     # ---------- Eventos ----------
 

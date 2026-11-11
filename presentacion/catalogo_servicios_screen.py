@@ -1,38 +1,47 @@
-"""
-Pantalla de Catálogo de servicios y recetas (S5-10).
-
-Usa la lógica que ya existe, sin tocar SQL:
-    ServiciosLogica.listar_servicios()            -> [{id, nombre, precio, activo}]
-    ServiciosLogica.registrar_servicio(nombre, precio)
-    ServiciosLogica.editar_servicio(servicio_id, nombre, precio)
-    ServiciosLogica.eliminar_servicio(servicio_id)          (lo desactiva)
-
-    InventarioLogica.listar_insumos()             -> [{id, nombre, unidad_medida, ...}]
-    InventarioLogica.listar_insumos_de_servicio(servicio_id)
-        -> [{servicio_id, insumo_id, cantidad_consumida, nombre_insumo, unidad_medida}]
-    InventarioLogica.asignar_insumo_a_servicio(servicio_id, insumo_id, cantidad)
-        (si ya existía la receta, la actualiza)
-    InventarioLogica.quitar_insumo_de_servicio(servicio_id, insumo_id)
-"""
-
 from tkinter import messagebox, ttk
 import customtkinter as ctk
 
 from logica.servicios_logica import ServiciosLogica
 from logica.inventario_logica import InventarioLogica
+from presentacion.sidebar_component import SidebarComponent, configurar_estilo_tabla
 
 
 class CatalogoServiciosScreen(ctk.CTkFrame):
+    """
+    Pantalla de Catálogo de servicios y recetas fiel al diseño Figma (Imagen 3 derecha):
+    - Barra lateral #0B4F66 (SidebarComponent) con sección activa 'Catálogo'.
+    - Área principal #E7F9FF con enlace '← volver al panel principal'.
+    - Tarjeta blanca superior 'Registrar servicio' (2 columnas de inputs + fila de botones).
+    - Tabla de servicios y sección inferior de Receta con tablas Autowash.Treeview (#BCE3F0)
+      y controles en #F68B2E / #F27878.
+    """
 
-    def __init__(self, parent, al_volver=None):
-        super().__init__(parent)
-        self.al_volver = al_volver
+    def __init__(self, parent, al_volver=None, al_ir_dashboard=None,
+                 al_ir_clientes=None, al_ir_vehiculos=None,
+                 al_ir_servicios=None, al_ir_empleados=None,
+                 al_ir_inventario=None, al_ir_facturacion=None,
+                 al_ir_reportes=None, al_ir_catalogo=None,
+                 al_ir_facturas=None, al_cerrar_sesion=None, **kwargs):
+        super().__init__(parent, fg_color="#E7F9FF", corner_radius=0)
+        self.al_volver = al_volver or al_ir_dashboard
+        self.al_ir_dashboard = al_ir_dashboard or al_volver
+        self.al_ir_clientes = al_ir_clientes
+        self.al_ir_vehiculos = al_ir_vehiculos
+        self.al_ir_servicios = al_ir_servicios
+        self.al_ir_empleados = al_ir_empleados
+        self.al_ir_inventario = al_ir_inventario
+        self.al_ir_facturacion = al_ir_facturacion
+        self.al_ir_reportes = al_ir_reportes
+        self.al_ir_catalogo = al_ir_catalogo
+        self.al_ir_facturas = al_ir_facturas
+        self.al_cerrar_sesion = al_cerrar_sesion
 
-        self.servicio_seleccionado = None  # dict del servicio elegido en la tabla
+        self.servicio_seleccionado = None
         self.insumos_disponibles = []
 
-        self.pack(fill="both", expand=True, padx=20, pady=20)
+        self.pack(fill="both", expand=True)
 
+        configurar_estilo_tabla()
         self._crear_interfaz()
         self._cargar_servicios()
         self._cargar_insumos_en_combo()
@@ -40,97 +49,325 @@ class CatalogoServiciosScreen(ctk.CTkFrame):
     # ---------- Interfaz ----------
 
     def _crear_interfaz(self):
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 10))
+        # ------------------------------------------------------------------ #
+        # 1. BARRA LATERAL (SIDEBAR)                                         #
+        # ------------------------------------------------------------------ #
+        self.sidebar = SidebarComponent(
+            self,
+            seccion_activa="Catálogo",
+            al_volver=self.al_volver,
+            al_ir_dashboard=self.al_ir_dashboard,
+            al_ir_clientes=self.al_ir_clientes,
+            al_ir_vehiculos=self.al_ir_vehiculos,
+            al_ir_servicios=self.al_ir_servicios,
+            al_ir_empleados=self.al_ir_empleados,
+            al_ir_inventario=self.al_ir_inventario,
+            al_ir_facturacion=self.al_ir_facturacion,
+            al_ir_reportes=self.al_ir_reportes,
+            al_ir_catalogo=self.al_ir_catalogo,
+            al_ir_facturas=self.al_ir_facturas,
+            al_cerrar_sesion=self.al_cerrar_sesion,
+        )
+
+        # ------------------------------------------------------------------ #
+        # 2. CONTENEDOR PRINCIPAL DERECHO                                    #
+        # ------------------------------------------------------------------ #
+        self.main_container = ctk.CTkFrame(self, fg_color="#E7F9FF", corner_radius=0)
+        self.main_container.pack(side="right", fill="both", expand=True)
+
+        self.scroll_body = ctk.CTkScrollableFrame(self.main_container, fg_color="#E7F9FF")
+        self.scroll_body.pack(fill="both", expand=True, padx=28, pady=20)
+
+        # ————— ENCABEZADO Y NAVEGACIÓN —————
+        header_nav = ctk.CTkFrame(self.scroll_body, fg_color="transparent")
+        header_nav.pack(fill="x", pady=(0, 6))
+
+        btn_volver_dash = ctk.CTkButton(
+            header_nav,
+            text="← volver al panel principal",
+            command=self.al_volver,
+            fg_color="transparent",
+            hover_color="#D5EFF7",
+            text_color="#0B4F66",
+            font=("Segoe UI", 12, "bold"),
+            anchor="w",
+            height=28
+        )
+        btn_volver_dash.pack(side="left")
 
         ctk.CTkLabel(
-            header, text="Catálogo de Servicios y Recetas",
-            font=ctk.CTkFont(size=20, weight="bold"),
+            self.scroll_body,
+            text="Catálogo de servicios y recetas",
+            font=("Georgia", 30),
+            text_color="#000000",
+            anchor="w"
+        ).pack(fill="x", pady=(4, 2))
+
+        ctk.CTkLabel(
+            self.scroll_body,
+            text="Precios de cada servicio y los insumos que consume",
+            font=("Segoe UI", 13),
+            text_color="#666666",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 16))
+
+        # ————— TARJETA BLANCA SUPERIOR: Registrar servicio —————
+        card_servicio = ctk.CTkFrame(
+            self.scroll_body,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_servicio.pack(fill="x", pady=(0, 16))
+
+        inner_serv = ctk.CTkFrame(card_servicio, fg_color="transparent")
+        inner_serv.pack(fill="both", expand=True, padx=24, pady=18)
+
+        ctk.CTkLabel(
+            inner_serv,
+            text="Registrar servicio",
+            font=("Georgia", 18),
+            text_color="#3C3B3B",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 12))
+
+        # Fila 1: Inputs (2 columnas)
+        fila_inputs = ctk.CTkFrame(inner_serv, fg_color="transparent")
+        fila_inputs.pack(fill="x", pady=(0, 14))
+        fila_inputs.grid_columnconfigure(0, weight=2)
+        fila_inputs.grid_columnconfigure(1, weight=1)
+
+        col_nom = ctk.CTkFrame(fila_inputs, fg_color="transparent")
+        col_nom.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+
+        ctk.CTkLabel(
+            col_nom,
+            text="Nombre del servicio",
+            font=("Segoe UI", 11, "bold"),
+            text_color="#111111",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 4))
+
+        self.entry_nombre = ctk.CTkEntry(
+            col_nom,
+            placeholder_text="Nombre del servicio",
+            placeholder_text_color="#666666",
+            text_color="#111111",
+            fg_color="#FFFFFF",
+            border_color="#000000",
+            border_width=1,
+            corner_radius=14,
+            height=40,
+            font=("Segoe UI", 12)
+        )
+        self.entry_nombre.pack(fill="x")
+
+        col_pre = ctk.CTkFrame(fila_inputs, fg_color="transparent")
+        col_pre.grid(row=0, column=1, sticky="ew", padx=(12, 0))
+
+        ctk.CTkLabel(
+            col_pre,
+            text="Precio",
+            font=("Segoe UI", 11, "bold"),
+            text_color="#111111",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 4))
+
+        self.entry_precio = ctk.CTkEntry(
+            col_pre,
+            placeholder_text="Precio",
+            placeholder_text_color="#666666",
+            text_color="#111111",
+            fg_color="#FFFFFF",
+            border_color="#000000",
+            border_width=1,
+            corner_radius=14,
+            height=40,
+            font=("Segoe UI", 12)
+        )
+        self.entry_precio.pack(fill="x")
+
+        # Fila 2: Botones alineados a la izquierda
+        fila_btns = ctk.CTkFrame(inner_serv, fg_color="transparent")
+        fila_btns.pack(fill="x")
+
+        ctk.CTkButton(
+            fila_btns,
+            text="Registrar",
+            fg_color="#F68B2E",
+            hover_color="#E0781E",
+            text_color="#000000",
+            font=("Segoe UI", 12, "bold"),
+            corner_radius=12,
+            height=36,
+            width=120,
+            command=self._evento_registrar_servicio,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            fila_btns,
+            text="Guardar cambios",
+            fg_color="#F68B2E",
+            hover_color="#E0781E",
+            text_color="#000000",
+            font=("Segoe UI", 12, "bold"),
+            corner_radius=12,
+            height=36,
+            width=145,
+            command=self._evento_editar_servicio,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            fila_btns,
+            text="Eliminar",
+            fg_color="#F27878",
+            hover_color="#E05A5A",
+            text_color="#000000",
+            font=("Segoe UI", 12, "bold"),
+            corner_radius=12,
+            height=36,
+            width=110,
+            command=self._evento_eliminar_servicio,
         ).pack(side="left")
 
-        if self.al_volver:
-            ctk.CTkButton(
-                header, text="Volver al Dashboard", fg_color="gray",
-                hover_color="#505050", width=140, command=self.al_volver,
-            ).pack(side="right")
+        # ————— TABLA DE SERVICIOS —————
+        card_tabla_serv = ctk.CTkFrame(
+            self.scroll_body,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_tabla_serv.pack(fill="x", pady=(0, 18))
 
-        # --- Formulario del servicio ---
-        form = ctk.CTkFrame(self, fg_color="transparent")
-        form.pack(fill="x", padx=10, pady=5)
+        inner_ts = ctk.CTkFrame(card_tabla_serv, fg_color="transparent")
+        inner_ts.pack(fill="both", expand=True, padx=16, pady=14)
 
-        self.entry_nombre = ctk.CTkEntry(form, placeholder_text="Nombre del servicio", width=260)
-        self.entry_nombre.pack(side="left", padx=(0, 8))
-
-        self.entry_precio = ctk.CTkEntry(form, placeholder_text="Precio", width=110)
-        self.entry_precio.pack(side="left", padx=8)
-
-        ctk.CTkButton(
-            form, text="Registrar", fg_color="green", width=90,
-            command=self._evento_registrar_servicio,
-        ).pack(side="left", padx=4)
-        ctk.CTkButton(
-            form, text="Guardar cambios", width=120,
-            command=self._evento_editar_servicio,
-        ).pack(side="left", padx=4)
-        ctk.CTkButton(
-            form, text="Eliminar", fg_color="darkred", hover_color="#500000", width=80,
-            command=self._evento_eliminar_servicio,
-        ).pack(side="left", padx=4)
-
-        # --- Tabla de servicios ---
         columnas = ("id", "nombre", "precio")
         self.tabla_servicios = ttk.Treeview(
-            self, columns=columnas, show="headings", height=5, selectmode="browse"
+            inner_ts,
+            columns=columnas,
+            show="headings",
+            height=5,
+            selectmode="browse",
+            style="Autowash.Treeview"
         )
         self.tabla_servicios.heading("id", text="ID")
         self.tabla_servicios.heading("nombre", text="Servicio")
         self.tabla_servicios.heading("precio", text="Precio")
-        self.tabla_servicios.column("id", width=50, anchor="center")
-        self.tabla_servicios.column("nombre", width=320, anchor="w")
-        self.tabla_servicios.column("precio", width=120, anchor="e")
-        self.tabla_servicios.pack(fill="x", padx=10, pady=8)
+        self.tabla_servicios.column("id", width=70, anchor="center")
+        self.tabla_servicios.column("nombre", width=340, anchor="center")
+        self.tabla_servicios.column("precio", width=150, anchor="center")
+        self.tabla_servicios.pack(fill="x")
         self.tabla_servicios.bind("<<TreeviewSelect>>", self._al_seleccionar_servicio)
 
-        # --- Receta del servicio seleccionado ---
+        # ————— SECCIÓN DE RECETA DEBAJO —————
         self.label_receta = ctk.CTkLabel(
-            self, text="Receta: seleccione un servicio",
-            font=ctk.CTkFont(size=14, weight="bold"), anchor="w",
+            self.scroll_body,
+            text="Receta: seleccione un servicio",
+            font=("Georgia", 16),
+            text_color="#3C3B3B",
+            anchor="w"
         )
-        self.label_receta.pack(fill="x", padx=10, pady=(8, 2))
+        self.label_receta.pack(fill="x", pady=(0, 8))
+
+        card_receta = ctk.CTkFrame(
+            self.scroll_body,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_receta.pack(fill="both", expand=True, pady=(0, 14))
+
+        inner_rec = ctk.CTkFrame(card_receta, fg_color="transparent")
+        inner_rec.pack(fill="both", expand=True, padx=16, pady=14)
 
         columnas_receta = ("insumo_id", "insumo", "cantidad", "unidad")
         self.tabla_receta = ttk.Treeview(
-            self, columns=columnas_receta, show="headings", height=4, selectmode="browse"
+            inner_rec,
+            columns=columnas_receta,
+            show="headings",
+            height=4,
+            selectmode="browse",
+            style="Autowash.Treeview"
         )
         self.tabla_receta.heading("insumo_id", text="ID")
         self.tabla_receta.heading("insumo", text="Insumo")
         self.tabla_receta.heading("cantidad", text="Cantidad por servicio")
         self.tabla_receta.heading("unidad", text="Unidad")
-        self.tabla_receta.column("insumo_id", width=50, anchor="center")
-        self.tabla_receta.column("insumo", width=260, anchor="w")
-        self.tabla_receta.column("cantidad", width=150, anchor="center")
-        self.tabla_receta.column("unidad", width=100, anchor="center")
-        self.tabla_receta.pack(fill="x", padx=10, pady=4)
 
-        fila_receta = ctk.CTkFrame(self, fg_color="transparent")
-        fila_receta.pack(fill="x", padx=10, pady=8)
+        self.tabla_receta.column("insumo_id", width=70, anchor="center")
+        self.tabla_receta.column("insumo", width=260, anchor="center")
+        self.tabla_receta.column("cantidad", width=160, anchor="center")
+        self.tabla_receta.column("unidad", width=120, anchor="center")
+        self.tabla_receta.pack(fill="both", expand=True)
+
+        # Fila inferior de controles de receta
+        fila_receta = ctk.CTkFrame(self.scroll_body, fg_color="transparent")
+        fila_receta.pack(fill="x", pady=(0, 6))
 
         self.combo_insumo = ctk.CTkComboBox(
-            fila_receta, values=["Sin insumos registrados"], state="readonly", width=260
+            fila_receta,
+            values=["Sin insumos registrados"],
+            state="readonly",
+            height=38,
+            corner_radius=14,
+            fg_color="#FFFFFF",
+            border_color="#000000",
+            border_width=1,
+            button_color="#FFFFFF",
+            button_hover_color="#E7F9FF",
+            text_color="#111111",
+            dropdown_fg_color="#FFFFFF",
+            dropdown_text_color="#111111",
+            dropdown_hover_color="#D9F0F9",
+            width=260,
+            font=("Segoe UI", 11)
         )
-        self.combo_insumo.pack(side="left", padx=(0, 8))
+        self.combo_insumo.pack(side="left", padx=(0, 10))
 
-        self.entry_cantidad = ctk.CTkEntry(fila_receta, placeholder_text="Cantidad", width=100)
-        self.entry_cantidad.pack(side="left", padx=8)
+        self.entry_cantidad = ctk.CTkEntry(
+            fila_receta,
+            placeholder_text="Cantidad",
+            placeholder_text_color="#666666",
+            text_color="#111111",
+            fg_color="#FFFFFF",
+            border_color="#000000",
+            border_width=1,
+            corner_radius=14,
+            height=38,
+            width=120,
+            font=("Segoe UI", 11)
+        )
+        self.entry_cantidad.pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
-            fila_receta, text="Agregar / Actualizar", fg_color="green", width=150,
+            fila_receta,
+            text="Agregar / Actualizar",
+            fg_color="#F68B2E",
+            hover_color="#E0781E",
+            text_color="#000000",
+            font=("Segoe UI", 11, "bold"),
+            corner_radius=12,
+            height=38,
+            width=165,
             command=self._evento_agregar_insumo,
-        ).pack(side="left", padx=4)
+        ).pack(side="left", padx=(0, 10))
+
         ctk.CTkButton(
-            fila_receta, text="Quitar de la receta", fg_color="darkred",
-            hover_color="#500000", width=140, command=self._evento_quitar_insumo,
-        ).pack(side="left", padx=4)
+            fila_receta,
+            text="Quitar de la receta",
+            fg_color="#F27878",
+            hover_color="#E05A5A",
+            text_color="#000000",
+            font=("Segoe UI", 11, "bold"),
+            corner_radius=12,
+            height=38,
+            width=155,
+            command=self._evento_quitar_insumo,
+        ).pack(side="left")
 
     # ---------- Carga de datos ----------
 

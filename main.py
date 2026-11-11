@@ -12,13 +12,14 @@ from presentacion.reportes_screen import ReportesScreen
 from presentacion.catalogo_servicios_screen import CatalogoServiciosScreen
 from presentacion.facturas_screen import FacturasScreen
 
+
 class AplicacionPrincipal(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("AutoWash System")
-        self.geometry("900x650")
-        self.minsize(800, 600)
+        self.geometry("1100x720")
+        self.minsize(920, 620)
         ctk.set_appearance_mode("Dark")
         ctk.set_default_color_theme("blue")
 
@@ -29,6 +30,23 @@ class AplicacionPrincipal(ctk.CTk):
         for widget in self.winfo_children():
             widget.destroy()
 
+    def _nav_callbacks(self):
+        """Diccionario estándar de callbacks de navegación para todas las vistas."""
+        return {
+            "al_volver": self.mostrar_dashboard,
+            "al_ir_dashboard": self.mostrar_dashboard,
+            "al_ir_clientes": self.mostrar_clientes,
+            "al_ir_vehiculos": self.mostrar_vehiculos,
+            "al_ir_servicios": self.mostrar_servicios,
+            "al_ir_empleados": self.mostrar_empleados,
+            "al_ir_inventario": self.mostrar_inventario,
+            "al_ir_facturacion": self.mostrar_facturacion,
+            "al_ir_reportes": self.mostrar_reportes,
+            "al_ir_catalogo": self.mostrar_catalogo,
+            "al_ir_facturas": self.mostrar_facturas,
+            "al_cerrar_sesion": self.mostrar_login,
+        }
+
     def mostrar_login(self):
         self._limpiar_pantalla()
         self.vista_actual = LoginView(self, al_ingresar=self.mostrar_dashboard)
@@ -36,56 +54,44 @@ class AplicacionPrincipal(ctk.CTk):
 
     def mostrar_dashboard(self):
         self._limpiar_pantalla()
-        self.vista_actual = DashboardView(
-            self,
-            al_ir_clientes=self.mostrar_clientes,
-            al_ir_vehiculos=self.mostrar_vehiculos,
-            al_ir_empleados=self.mostrar_empleados,
-            al_ir_servicios=self.mostrar_servicios,
-            al_ir_inventario=self.mostrar_inventario,
-            al_ir_facturacion=self.mostrar_facturacion,
-            al_ir_reportes=self.mostrar_reportes,
-            al_ir_catalogo=self.mostrar_catalogo,
-            al_ir_facturas=self.mostrar_facturas,
-            al_cerrar_sesion=self.mostrar_login
-        )
-        self.vista_actual.pack(fill="both", expand=True)
+        self.vista_actual = DashboardView(self, **self._nav_callbacks())
 
     def mostrar_clientes(self):
         self._limpiar_pantalla()
-        self.vista_actual = ClientesScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = ClientesScreen(self, **self._nav_callbacks())
 
     def mostrar_vehiculos(self):
         self._limpiar_pantalla()
-        self.vista_actual = VehiculosScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = VehiculosScreen(self, **self._nav_callbacks())
 
     def mostrar_empleados(self):
         self._limpiar_pantalla()
-        self.vista_actual = EmpleadosScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = EmpleadosScreen(self, **self._nav_callbacks())
 
     def mostrar_servicios(self):
         self._limpiar_pantalla()
-        self.vista_actual = ServiciosScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = ServiciosScreen(self, **self._nav_callbacks())
 
     def mostrar_inventario(self):
         self._limpiar_pantalla()
-        self.vista_actual = InventarioScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = InventarioScreen(self, **self._nav_callbacks())
 
     def mostrar_facturacion(self):
         self._limpiar_pantalla()
-        self.vista_actual = FacturacionScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = FacturacionScreen(self, **self._nav_callbacks())
 
     def mostrar_reportes(self):
         self._limpiar_pantalla()
-        self.vista_actual = ReportesScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = ReportesScreen(self, **self._nav_callbacks())
 
     def mostrar_catalogo(self):
         self._limpiar_pantalla()
-        self.vista_actual = CatalogoServiciosScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = CatalogoServiciosScreen(self, **self._nav_callbacks())
 
     def mostrar_facturas(self):
         self._limpiar_pantalla()
-        self.vista_actual = FacturasScreen(self, al_volver=self.mostrar_dashboard)
+        self.vista_actual = FacturasScreen(self, **self._nav_callbacks())
+
 
 if __name__ == "__main__":
     app = AplicacionPrincipal()

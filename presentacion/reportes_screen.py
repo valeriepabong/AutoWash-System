@@ -1,44 +1,18 @@
 """
-Pantalla de Reportes.
+Pantalla de Reportes y estadísticas.
 
-CONTRATO REAL de logica/reportes_logica.py (ReportesLogica), confirmado
-con el backend:
+CONTRATO REAL de logica/reportes_logica.py (ReportesLogica):
     reporte_ingresos(fecha_desde=None, fecha_hasta=None) -> dict
-        {"rango": {"desde", "hasta"},
-         "filas": [{"fecha", "cantidad_facturas", "total_ingresos", "total_ingresos_texto"}],
-         "resumen": {"total_ingresos", "total_ingresos_texto", "cantidad_facturas",
-                     "promedio_por_factura", "promedio_por_factura_texto"},
-         "grafica": {"etiquetas": [...], "valores": [...]}}
-
     reporte_servicios_mas_solicitados(fecha_desde=None, fecha_hasta=None, limite=None) -> dict
-        {"rango": {...},
-         "filas": [{"posicion", "nombre_servicio", "cantidad_vendida",
-                    "ingreso_generado", "ingreso_generado_texto"}],
-         "resumen": {"total_servicios_vendidos", "servicio_top"},
-         "grafica": {"etiquetas": [...], "valores": [...]}}  (ya vienen invertidas
-         para que la barra horizontal quede con el más vendido arriba)
-
     reporte_consumo_insumos(fecha_desde=None, fecha_hasta=None) -> dict
-        {"rango": {...},
-         "filas": [{"nombre_insumo", "unidad_medida", "cantidad_consumida",
-                    "cantidad_consumida_texto"}],
-         "resumen": {"insumos_con_consumo", "insumo_top"},
-         "grafica": None}  (esta sección es solo tabla, sin gráfica)
-
-Las fechas van en formato "AAAA-MM-DD". Si se dejan vacías, ReportesLogica
-usa los últimos 30 días por defecto. Las tres funciones lanzan ValueError
-si el rango no es válido (fecha mal escrita, "desde" > "hasta", rango
-mayor a 366 días).
-
-Si por algún motivo logica/reportes_logica.py no está disponible todavía,
-esta pantalla cae en una versión de prueba (_ReportesLogicaMock) con el
-mismo contrato, para que la interfaz se pueda seguir probando.
 """
 
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+from presentacion.sidebar_component import SidebarComponent, configurar_estilo_tabla
 
 try:
     from logica.reportes_logica import ReportesLogica
@@ -105,88 +79,324 @@ except ImportError:
     ReportesLogica = _ReportesLogicaMock
 
 
-COLOR_FONDO = "#2b2b2b"
-COLOR_BARRA_INGRESOS = "#1f538d"
-COLOR_BARRA_SERVICIOS = "#2fa572"
-
-
-def _estilizar_eje(ax):
-    ax.set_facecolor(COLOR_FONDO)
-    ax.tick_params(colors="white", labelsize=8)
-    ax.spines["bottom"].set_color("white")
-    ax.spines["left"].set_color("white")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.title.set_color("white")
+COLOR_FONDO = "#FFFFFF"
+COLOR_BARRA = "#589EB5"
+COLOR_GRILLA = "#D9EEF5"
 
 
 class ReportesScreen(ctk.CTkFrame):
+    """
+    Pantalla de Reportes y estadísticas fiel al diseño Figma:
+    - Barra lateral #0B4F66 (SidebarComponent) con sección activa 'Reportes'.
+    - Área principal #E7F9FF con enlace '← volver al panel principal'.
+    - Selector de 3 botones tipo píldora:
+      [Ingresos por período], [Servicios más solicitados], [Consumo de insumos].
+    - Filtros blancos redondeados, gráficas Matplotlib limpias sobre fondo #FFFFFF
+      y tablas Autowash.Treeview con cabecera #BCE3F0.
+    """
 
-    def __init__(self, master, al_volver=None):
-        super().__init__(master)
-        self.al_volver = al_volver
-        self.pack(fill="both", expand=True, padx=20, pady=20)
+    def __init__(self, master, al_volver=None, al_ir_dashboard=None,
+                 al_ir_clientes=None, al_ir_vehiculos=None,
+                 al_ir_servicios=None, al_ir_empleados=None,
+                 al_ir_inventario=None, al_ir_facturacion=None,
+                 al_ir_reportes=None, al_ir_catalogo=None,
+                 al_ir_facturas=None, al_cerrar_sesion=None, **kwargs):
+        super().__init__(master, fg_color="#E7F9FF", corner_radius=0)
+        self.al_volver = al_volver or al_ir_dashboard
+        self.al_ir_dashboard = al_ir_dashboard or al_volver
+        self.al_ir_clientes = al_ir_clientes
+        self.al_ir_vehiculos = al_ir_vehiculos
+        self.al_ir_servicios = al_ir_servicios
+        self.al_ir_empleados = al_ir_empleados
+        self.al_ir_inventario = al_ir_inventario
+        self.al_ir_facturacion = al_ir_facturacion
+        self.al_ir_reportes = al_ir_reportes
+        self.al_ir_catalogo = al_ir_catalogo
+        self.al_ir_facturas = al_ir_facturas
+        self.al_cerrar_sesion = al_cerrar_sesion
 
-        self._crear_encabezado()
-        self._crear_pestanas()
+        self._vista_actual = "ingresos"
+        self._tab_buttons = {}
+        self._vistas = {}
+
+        self.pack(fill="both", expand=True)
+
+        configurar_estilo_tabla()
+        self._crear_interfaz()
 
         # Primera carga con el rango por defecto (últimos 30 días)
         self._filtrar_ingresos()
         self._filtrar_servicios()
         self._filtrar_insumos()
 
-    # ---------- Encabezado ----------
+    def _crear_interfaz(self):
+        # ------------------------------------------------------------------ #
+        # 1. BARRA LATERAL (SIDEBAR)                                         #
+        # ------------------------------------------------------------------ #
+        self.sidebar = SidebarComponent(
+            self,
+            seccion_activa="Reportes",
+            al_volver=self.al_volver,
+            al_ir_dashboard=self.al_ir_dashboard,
+            al_ir_clientes=self.al_ir_clientes,
+            al_ir_vehiculos=self.al_ir_vehiculos,
+            al_ir_servicios=self.al_ir_servicios,
+            al_ir_empleados=self.al_ir_empleados,
+            al_ir_inventario=self.al_ir_inventario,
+            al_ir_facturacion=self.al_ir_facturacion,
+            al_ir_reportes=self.al_ir_reportes,
+            al_ir_catalogo=self.al_ir_catalogo,
+            al_ir_facturas=self.al_ir_facturas,
+            al_cerrar_sesion=self.al_cerrar_sesion,
+        )
 
-    def _crear_encabezado(self):
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 10))
+        # ------------------------------------------------------------------ #
+        # 2. CONTENEDOR PRINCIPAL DERECHO                                    #
+        # ------------------------------------------------------------------ #
+        self.main_container = ctk.CTkFrame(self, fg_color="#E7F9FF", corner_radius=0)
+        self.main_container.pack(side="right", fill="both", expand=True)
+
+        self.scroll_body = ctk.CTkScrollableFrame(self.main_container, fg_color="#E7F9FF")
+        self.scroll_body.pack(fill="both", expand=True, padx=28, pady=20)
+
+        # ————— ENCABEZADO Y NAVEGACIÓN —————
+        header_nav = ctk.CTkFrame(self.scroll_body, fg_color="transparent")
+        header_nav.pack(fill="x", pady=(0, 6))
+
+        btn_volver_dash = ctk.CTkButton(
+            header_nav,
+            text="← volver al panel principal",
+            command=self.al_volver,
+            fg_color="transparent",
+            hover_color="#D5EFF7",
+            text_color="#0B4F66",
+            font=("Segoe UI", 12, "bold"),
+            anchor="w",
+            height=28
+        )
+        btn_volver_dash.pack(side="left")
 
         ctk.CTkLabel(
-            header, text="Módulo de Reportes", font=ctk.CTkFont(size=22, weight="bold")
-        ).pack(side="left")
+            self.scroll_body,
+            text="Reportes y estadísticas",
+            font=("Georgia", 30),
+            text_color="#000000",
+            anchor="w"
+        ).pack(fill="x", pady=(4, 2))
 
-        if self.al_volver:
-            ctk.CTkButton(
-                header, text="Volver al Dashboard", command=self.al_volver, width=150
-            ).pack(side="right")
+        ctk.CTkLabel(
+            self.scroll_body,
+            text="Ingresos, servicios más solicitados y consumo de insumos",
+            font=("Segoe UI", 13),
+            text_color="#666666",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 14))
 
-    def _crear_pestanas(self):
-        self.tabs = ctk.CTkTabview(self)
-        self.tabs.pack(fill="both", expand=True)
+        # ————— SELECTOR DE 3 BOTONES TIPO PÍLDORA —————
+        pills_frame = ctk.CTkFrame(self.scroll_body, fg_color="transparent")
+        pills_frame.pack(fill="x", pady=(0, 16))
 
-        self.tab_ingresos = self.tabs.add("Ingresos por Período")
-        self.tab_servicios = self.tabs.add("Servicios más Solicitados")
-        self.tab_insumos = self.tabs.add("Consumo de Insumos")
+        definicion_tabs = [
+            ("ingresos",  "Ingresos por período"),
+            ("servicios", "Servicios más solicitados"),
+            ("insumos",   "Consumo de insumos"),
+        ]
 
-        self._construir_tab_ingresos()
-        self._construir_tab_servicios()
-        self._construir_tab_insumos()
+        for clave, titulo in definicion_tabs:
+            btn = ctk.CTkButton(
+                pills_frame,
+                text=titulo,
+                command=lambda c=clave: self._seleccionar_vista(c),
+                height=36,
+                corner_radius=16,
+                border_width=1,
+                font=("Segoe UI", 12, "bold"),
+            )
+            btn.pack(side="left", padx=(0, 10))
+            self._tab_buttons[clave] = btn
 
-    # ---------- TAB 1: Ingresos por periodo ----------
+        # ————— CONTENEDOR DE VISTAS —————
+        self.contenedor_vistas = ctk.CTkFrame(self.scroll_body, fg_color="transparent")
+        self.contenedor_vistas.pack(fill="both", expand=True)
 
-    def _construir_tab_ingresos(self):
-        frame_top = ctk.CTkFrame(self.tab_ingresos, fg_color="transparent")
-        frame_top.pack(fill="x", pady=10)
+        self.vista_ingresos = ctk.CTkFrame(self.contenedor_vistas, fg_color="transparent")
+        self.vista_servicios = ctk.CTkFrame(self.contenedor_vistas, fg_color="transparent")
+        self.vista_insumos = ctk.CTkFrame(self.contenedor_vistas, fg_color="transparent")
 
-        ctk.CTkLabel(frame_top, text="Desde:").pack(side="left", padx=5)
-        self.entry_ingresos_desde = ctk.CTkEntry(frame_top, placeholder_text="AAAA-MM-DD", width=110)
-        self.entry_ingresos_desde.pack(side="left", padx=5)
+        self._vistas = {
+            "ingresos":  self.vista_ingresos,
+            "servicios": self.vista_servicios,
+            "insumos":   self.vista_insumos,
+        }
 
-        ctk.CTkLabel(frame_top, text="Hasta:").pack(side="left", padx=5)
-        self.entry_ingresos_hasta = ctk.CTkEntry(frame_top, placeholder_text="AAAA-MM-DD", width=110)
-        self.entry_ingresos_hasta.pack(side="left", padx=5)
+        self._construir_vista_ingresos()
+        self._construir_vista_servicios()
+        self._construir_vista_insumos()
+
+        self._seleccionar_vista("ingresos")
+
+    def _seleccionar_vista(self, clave):
+        self._vista_actual = clave
+        for k, btn in self._tab_buttons.items():
+            if k == clave:
+                btn.configure(
+                    fg_color="#7BB6C9",
+                    hover_color="#69A7BC",
+                    text_color="#FFFFFF",
+                    border_color="#589EB5",
+                )
+            else:
+                btn.configure(
+                    fg_color="#FFFFFF",
+                    hover_color="#EBF7FB",
+                    text_color="#111111",
+                    border_color="#7BB6C9",
+                )
+
+        for k, frame in self._vistas.items():
+            if k == clave:
+                frame.pack(fill="both", expand=True)
+            else:
+                frame.pack_forget()
+
+    def _crear_barra_filtro(self, parent, cmd_filtrar):
+        """Crea la barra blanca redondeada de filtro de fechas reutilizable."""
+        barra = ctk.CTkFrame(
+            parent,
+            fg_color="#FFFFFF",
+            corner_radius=14,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        barra.pack(fill="x", pady=(0, 16))
+
+        inner = ctk.CTkFrame(barra, fg_color="transparent")
+        inner.pack(fill="x", padx=16, pady=12)
+
+        ctk.CTkLabel(inner, text="Desde:", font=("Segoe UI", 12, "bold"), text_color="#111111").pack(side="left", padx=(0, 6))
+        entry_desde = ctk.CTkEntry(
+            inner,
+            placeholder_text="AAAA-MM-DD",
+            placeholder_text_color="#666666",
+            width=125,
+            height=36,
+            corner_radius=12,
+            border_color="#000000",
+            border_width=1,
+            fg_color="#FFFFFF",
+            text_color="#111111",
+            font=("Segoe UI", 11)
+        )
+        entry_desde.pack(side="left", padx=(0, 12))
+
+        ctk.CTkLabel(inner, text="Hasta:", font=("Segoe UI", 12, "bold"), text_color="#111111").pack(side="left", padx=(0, 6))
+        entry_hasta = ctk.CTkEntry(
+            inner,
+            placeholder_text="AAAA-MM-DD",
+            placeholder_text_color="#666666",
+            width=125,
+            height=36,
+            corner_radius=12,
+            border_color="#000000",
+            border_width=1,
+            fg_color="#FFFFFF",
+            text_color="#111111",
+            font=("Segoe UI", 11)
+        )
+        entry_hasta.pack(side="left", padx=(0, 14))
 
         ctk.CTkButton(
-            frame_top, text="Filtrar", width=90, command=self._filtrar_ingresos
-        ).pack(side="left", padx=10)
+            inner,
+            text="Filtrar",
+            width=95,
+            height=36,
+            corner_radius=12,
+            fg_color="#F68B2E",
+            hover_color="#E0781E",
+            text_color="#000000",
+            font=("Segoe UI", 12, "bold"),
+            command=cmd_filtrar
+        ).pack(side="left")
+
+        return inner, entry_desde, entry_hasta
+
+    # ---------- VISTA 1: Ingresos por período ----------
+
+    def _construir_vista_ingresos(self):
+        inner_barra, self.entry_ingresos_desde, self.entry_ingresos_hasta = self._crear_barra_filtro(
+            self.vista_ingresos, self._filtrar_ingresos
+        )
 
         self.label_total_ingresos = ctk.CTkLabel(
-            frame_top, text="Total acumulado: $0", font=ctk.CTkFont(size=14, weight="bold")
+            inner_barra,
+            text="Total acumulado: $0",
+            font=("Georgia", 14, "bold"),
+            text_color="#3C3B3B"
         )
-        self.label_total_ingresos.pack(side="right", padx=10)
+        self.label_total_ingresos.pack(side="right", padx=(10, 4))
 
-        self.frame_grafica_ingresos = ctk.CTkFrame(self.tab_ingresos, fg_color="transparent")
-        self.frame_grafica_ingresos.pack(fill="both", expand=True, pady=10)
+        # Tarjeta blanca de la gráfica
+        card_grafica = ctk.CTkFrame(
+            self.vista_ingresos,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_grafica.pack(fill="x", pady=(0, 16))
+
+        inner_graf = ctk.CTkFrame(card_grafica, fg_color="transparent")
+        inner_graf.pack(fill="both", expand=True, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            inner_graf,
+            text="Ingresos por día",
+            font=("Georgia", 18),
+            text_color="#3C3B3B",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 8))
+
+        self.frame_grafica_ingresos = ctk.CTkFrame(inner_graf, fg_color="#FFFFFF")
+        self.frame_grafica_ingresos.pack(fill="both", expand=True)
+
+        # Tabla de detalle por día debajo de la gráfica (mantiene compatibilidad con test_reportes_screen_muestra_tabla_filas)
+        card_tabla = ctk.CTkFrame(
+            self.vista_ingresos,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_tabla.pack(fill="both", expand=True)
+
+        inner_tab = ctk.CTkFrame(card_tabla, fg_color="transparent")
+        inner_tab.pack(fill="both", expand=True, padx=18, pady=14)
+
+        ctk.CTkLabel(
+            inner_tab,
+            text="Detalle de ventas por día",
+            font=("Georgia", 15),
+            text_color="#3C3B3B",
+            anchor="w",
+        ).pack(fill="x", pady=(0, 8))
+
+        columnas_ingresos = ("fecha", "cantidad_facturas", "total_ingresos")
+        self.tabla_ingresos = ttk.Treeview(
+            inner_tab,
+            columns=columnas_ingresos,
+            show="headings",
+            height=6,
+            style="Autowash.Treeview"
+        )
+        self.tabla_ingresos.heading("fecha", text="Fecha")
+        self.tabla_ingresos.heading("cantidad_facturas", text="Facturas Emitidas")
+        self.tabla_ingresos.heading("total_ingresos", text="Total Vendido")
+
+        self.tabla_ingresos.column("fecha", width=130, anchor="center")
+        self.tabla_ingresos.column("cantidad_facturas", width=130, anchor="center")
+        self.tabla_ingresos.column("total_ingresos", width=150, anchor="center")
+
+        self.tabla_ingresos.pack(fill="both", expand=True)
 
     def _filtrar_ingresos(self):
         desde = self.entry_ingresos_desde.get().strip() or None
@@ -208,12 +418,40 @@ class ReportesScreen(ctk.CTkFrame):
         etiquetas = reporte["grafica"]["etiquetas"]
         valores = reporte["grafica"]["valores"]
 
-        fig, ax = plt.subplots(figsize=(5, 3.2), dpi=100)
+        fig, ax = plt.subplots(figsize=(6.8, 3.4), dpi=100)
         fig.patch.set_facecolor(COLOR_FONDO)
-        _estilizar_eje(ax)
-        ax.bar(etiquetas, valores, color=COLOR_BARRA_INGRESOS)
-        ax.set_title("Ingresos por día", fontsize=11)
-        ax.tick_params(axis="x", rotation=45)
+        ax.set_facecolor(COLOR_FONDO)
+
+        # Grilla horizontal suave y estética limpia
+        ax.yaxis.grid(True, color=COLOR_GRILLA, linestyle="-", linewidth=0.9)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_color("#D9EEF5")
+        ax.spines["bottom"].set_color("#D9EEF5")
+        ax.tick_params(colors="#555555", labelsize=8)
+
+        if etiquetas:
+            bars = ax.bar(etiquetas, valores, color=COLOR_BARRA, width=0.55)
+            max_val = max(valores) if valores else 0
+            if max_val > 0:
+                ax.set_ylim(0, max_val * 1.2)
+            for bar, val in zip(bars, valores):
+                if val > 0:
+                    ax.text(
+                        bar.get_x() + bar.get_width() / 2.0,
+                        bar.get_height() + (max_val * 0.02 if max_val > 0 else 1),
+                        f"${val:,.0f}".replace(",", "."),
+                        ha="center",
+                        va="bottom",
+                        fontsize=8,
+                        color="#555555",
+                        fontweight="bold",
+                    )
+            ax.tick_params(axis="x", rotation=35)
+        else:
+            ax.text(0.5, 0.5, "Sin datos en este período", ha="center", va="center", color="#666666", transform=ax.transAxes)
+
         fig.tight_layout()
 
         canvas = FigureCanvasTkAgg(fig, master=self.frame_grafica_ingresos)
@@ -221,31 +459,58 @@ class ReportesScreen(ctk.CTkFrame):
         canvas.get_tk_widget().pack(fill="both", expand=True)
         plt.close(fig)
 
-    # ---------- TAB 2: Servicios más solicitados ----------
+        # Poblar la tabla de detalle por día
+        for item in self.tabla_ingresos.get_children():
+            self.tabla_ingresos.delete(item)
 
-    def _construir_tab_servicios(self):
-        frame_top = ctk.CTkFrame(self.tab_servicios, fg_color="transparent")
-        frame_top.pack(fill="x", pady=10)
+        for f in reporte.get("filas", []):
+            self.tabla_ingresos.insert(
+                "",
+                "end",
+                values=(
+                    f.get("fecha", ""),
+                    f.get("cantidad_facturas", 0),
+                    f.get("total_ingresos_texto", "$0"),
+                ),
+            )
 
-        ctk.CTkLabel(frame_top, text="Desde:").pack(side="left", padx=5)
-        self.entry_servicios_desde = ctk.CTkEntry(frame_top, placeholder_text="AAAA-MM-DD", width=110)
-        self.entry_servicios_desde.pack(side="left", padx=5)
+    # ---------- VISTA 2: Servicios más solicitados ----------
 
-        ctk.CTkLabel(frame_top, text="Hasta:").pack(side="left", padx=5)
-        self.entry_servicios_hasta = ctk.CTkEntry(frame_top, placeholder_text="AAAA-MM-DD", width=110)
-        self.entry_servicios_hasta.pack(side="left", padx=5)
-
-        ctk.CTkButton(
-            frame_top, text="Filtrar", width=90, command=self._filtrar_servicios
-        ).pack(side="left", padx=10)
+    def _construir_vista_servicios(self):
+        inner_barra, self.entry_servicios_desde, self.entry_servicios_hasta = self._crear_barra_filtro(
+            self.vista_servicios, self._filtrar_servicios
+        )
 
         self.label_servicio_top = ctk.CTkLabel(
-            frame_top, text="Más vendido: -", font=ctk.CTkFont(size=14, weight="bold")
+            inner_barra,
+            text="Más vendido: -",
+            font=("Georgia", 14, "bold"),
+            text_color="#3C3B3B"
         )
-        self.label_servicio_top.pack(side="right", padx=10)
+        self.label_servicio_top.pack(side="right", padx=(10, 4))
 
-        self.frame_grafica_servicios = ctk.CTkFrame(self.tab_servicios, fg_color="transparent")
-        self.frame_grafica_servicios.pack(fill="both", expand=True, pady=10)
+        card_grafica = ctk.CTkFrame(
+            self.vista_servicios,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_width=1,
+            border_color="#CCE5F0"
+        )
+        card_grafica.pack(fill="both", expand=True)
+
+        inner_graf = ctk.CTkFrame(card_grafica, fg_color="transparent")
+        inner_graf.pack(fill="both", expand=True, padx=20, pady=16)
+
+        ctk.CTkLabel(
+            inner_graf,
+            text="Cantidad de servicios vendidos",
+            font=("Georgia", 18),
+            text_color="#3C3B3B",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 8))
+
+        self.frame_grafica_servicios = ctk.CTkFrame(inner_graf, fg_color="#FFFFFF")
+        self.frame_grafica_servicios.pack(fill="both", expand=True)
 
     def _filtrar_servicios(self):
         desde = self.entry_servicios_desde.get().strip() or None
@@ -266,12 +531,37 @@ class ReportesScreen(ctk.CTkFrame):
         etiquetas = reporte["grafica"]["etiquetas"]
         valores = reporte["grafica"]["valores"]
 
-        fig, ax = plt.subplots(figsize=(5, 3.2), dpi=100)
+        fig, ax = plt.subplots(figsize=(6.8, 3.6), dpi=100)
         fig.patch.set_facecolor(COLOR_FONDO)
-        _estilizar_eje(ax)
+        ax.set_facecolor(COLOR_FONDO)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.spines["left"].set_color("#D9EEF5")
+        ax.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
+        ax.tick_params(axis="y", colors="#333333", labelsize=9)
+
         if etiquetas:
-            ax.barh(etiquetas, valores, color=COLOR_BARRA_SERVICIOS)
-        ax.set_title("Cantidad de servicios vendidos", fontsize=11)
+            bars = ax.barh(etiquetas, valores, color=COLOR_BARRA, height=0.55)
+            max_val = max(valores) if valores else 0
+            if max_val > 0:
+                ax.set_xlim(0, max_val * 1.18)
+            for bar, val in zip(bars, valores):
+                txt_val = f"{int(val)}" if float(val).is_integer() else f"{val:g}"
+                ax.text(
+                    bar.get_width() + (max_val * 0.02 if max_val > 0 else 0.5),
+                    bar.get_y() + bar.get_height() / 2.0,
+                    txt_val,
+                    va="center",
+                    ha="left",
+                    fontsize=9,
+                    color="#333333",
+                    fontweight="bold",
+                )
+        else:
+            ax.text(0.5, 0.5, "Sin datos en este período", ha="center", va="center", color="#666666", transform=ax.transAxes)
+
         fig.tight_layout()
 
         canvas = FigureCanvasTkAgg(fig, master=self.frame_grafica_servicios)
@@ -279,32 +569,32 @@ class ReportesScreen(ctk.CTkFrame):
         canvas.get_tk_widget().pack(fill="both", expand=True)
         plt.close(fig)
 
-    # ---------- TAB 3: Consumo de insumos (solo tabla) ----------
+    # ---------- VISTA 3: Consumo de insumos ----------
 
-    def _construir_tab_insumos(self):
-        frame_top = ctk.CTkFrame(self.tab_insumos, fg_color="transparent")
-        frame_top.pack(fill="x", pady=10)
-
-        ctk.CTkLabel(frame_top, text="Desde:").pack(side="left", padx=5)
-        self.entry_insumos_desde = ctk.CTkEntry(frame_top, placeholder_text="AAAA-MM-DD", width=110)
-        self.entry_insumos_desde.pack(side="left", padx=5)
-
-        ctk.CTkLabel(frame_top, text="Hasta:").pack(side="left", padx=5)
-        self.entry_insumos_hasta = ctk.CTkEntry(frame_top, placeholder_text="AAAA-MM-DD", width=110)
-        self.entry_insumos_hasta.pack(side="left", padx=5)
-
-        ctk.CTkButton(
-            frame_top, text="Filtrar", width=90, command=self._filtrar_insumos
-        ).pack(side="left", padx=10)
+    def _construir_vista_insumos(self):
+        _, self.entry_insumos_desde, self.entry_insumos_hasta = self._crear_barra_filtro(
+            self.vista_insumos, self._filtrar_insumos
+        )
 
         ctk.CTkLabel(
-            self.tab_insumos,
+            self.vista_insumos,
             text="Resumen de insumos consumidos en el período",
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(anchor="w", pady=(10, 5))
+            font=("Georgia", 16),
+            text_color="#3C3B3B",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 8))
 
-        self.frame_tabla_insumos = ctk.CTkScrollableFrame(self.tab_insumos)
-        self.frame_tabla_insumos.pack(fill="both", expand=True, pady=5)
+        card_insumos = ctk.CTkFrame(
+            self.vista_insumos,
+            fg_color="#FFFFFF",
+            corner_radius=16,
+            border_color="#CCE5F0",
+            border_width=1
+        )
+        card_insumos.pack(fill="both", expand=True)
+
+        self.frame_tabla_insumos = ctk.CTkFrame(card_insumos, fg_color="#FFFFFF")
+        self.frame_tabla_insumos.pack(fill="both", expand=True, padx=16, pady=16)
 
     def _filtrar_insumos(self):
         desde = self.entry_insumos_desde.get().strip() or None
@@ -319,26 +609,37 @@ class ReportesScreen(ctk.CTkFrame):
         for widget in self.frame_tabla_insumos.winfo_children():
             widget.destroy()
 
-        encabezados = ["Insumo", "Cantidad consumida", "Unidad de medida"]
-        for col, texto in enumerate(encabezados):
-            ctk.CTkLabel(
-                self.frame_tabla_insumos, text=texto, font=ctk.CTkFont(weight="bold")
-            ).grid(row=0, column=col, padx=20, pady=5, sticky="w")
+        columnas = ("insumo", "cantidad", "unidad")
+        tabla_insumos = ttk.Treeview(
+            self.frame_tabla_insumos,
+            columns=columnas,
+            show="headings",
+            height=9,
+            style="Autowash.Treeview"
+        )
+        tabla_insumos.heading("insumo", text="Insumo")
+        tabla_insumos.heading("cantidad", text="Cantidad consumida")
+        tabla_insumos.heading("unidad", text="Unidad")
+
+        tabla_insumos.column("insumo", width=260, anchor="center")
+        tabla_insumos.column("cantidad", width=180, anchor="center")
+        tabla_insumos.column("unidad", width=140, anchor="center")
+        tabla_insumos.pack(fill="both", expand=True)
 
         filas = reporte["filas"]
         if not filas:
-            ctk.CTkLabel(
-                self.frame_tabla_insumos, text="Sin consumo de insumos en este periodo."
-            ).grid(row=1, column=0, columnspan=3, padx=20, pady=10, sticky="w")
+            tabla_insumos.insert(
+                "", "end", values=("Sin consumo de insumos en este período.", "—", "—")
+            )
             return
 
-        for fila_idx, insumo in enumerate(filas, start=1):
-            ctk.CTkLabel(self.frame_tabla_insumos, text=insumo["nombre_insumo"]).grid(
-                row=fila_idx, column=0, padx=20, pady=5, sticky="w"
-            )
-            ctk.CTkLabel(self.frame_tabla_insumos, text=insumo["cantidad_consumida_texto"]).grid(
-                row=fila_idx, column=1, padx=20, pady=5, sticky="w"
-            )
-            ctk.CTkLabel(self.frame_tabla_insumos, text=insumo["unidad_medida"]).grid(
-                row=fila_idx, column=2, padx=20, pady=5, sticky="w"
+        for insumo in filas:
+            tabla_insumos.insert(
+                "",
+                "end",
+                values=(
+                    insumo["nombre_insumo"],
+                    insumo["cantidad_consumida_texto"],
+                    insumo["unidad_medida"],
+                ),
             )
